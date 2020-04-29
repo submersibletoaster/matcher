@@ -8,6 +8,9 @@ https://github.com/pbnjay/pixfont
 * Go image similarity scorer
 https://github.com/rivo/duplo
 
+* Color similarity/ distance and proper colorspace
+github.com/lucasb-eyer/go-colorful
+
 * Quantization
 https://github.com/Nykakin/QuantizationTournament
 https://github.com/esimov/colorquant

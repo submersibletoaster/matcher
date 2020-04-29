@@ -40,6 +40,9 @@ func main() {
         png.Encode(f, img)
 	fmt.Println("matcher…")
 
+
+	pickPalette(srcImg,64)
+
 	_,store := fontMap(unscii.Font)
 	srcHash,_ := duplo.CreateHash(srcImg)
 	matches := store.Query(srcHash)
