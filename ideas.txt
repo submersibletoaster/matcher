@@ -1,0 +1,21 @@
+# Turn image into ANSI (w/ optimization for font type)
+
+
+* Go font renderer - has bdf to pixfont importer (unscii has bdf intermediate)
+https://github.com/pbnjay/pixfont
+
+
+* Go image similarity scorer
+https://github.com/rivo/duplo
+
+* Quantization
+https://github.com/Nykakin/QuantizationTournament
+https://github.com/esimov/colorquant
+
+Derive a palette for the image (terminal / ANSI colours)
+Take the input image and slice into cells of given cw+ch
+For each cell
+  * quantize to find the dominant fg,bg colors to use
+  * make a black on white and white on black version of the cell's pixels
+  * compare silhouette to each font glyph looking for the closest image structure
+  * emit an ANSI sequence for fg,bg and the best matching glyph
