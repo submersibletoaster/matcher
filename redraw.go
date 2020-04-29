@@ -5,7 +5,7 @@ import (
 	"image"
 	"image/color"
 	"github.com/Nykakin/quantize"
-	"github.com/joshdk/preview"
+	//"github.com/joshdk/preview"
 )
 
 func pickPalette(img image.Image,num int) (color.Palette) {
@@ -21,6 +21,6 @@ func pickPalette(img image.Image,num int) (color.Palette) {
 	}
 
 	// Display our new palette
-	preview.Show(palette)
+	//preview.Show(palette)
 	return palette
 }
