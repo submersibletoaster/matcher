@@ -9,10 +9,9 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"image/png"
+	_ "image/png"
 	"io/ioutil"
 	"os"
-
 	"github.com/rivo/duplo"
 
 	        "github.com/joshdk/preview"
@@ -31,19 +30,27 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if srcImg.ColorModel() != color.RGBAModel {
+		old := srcImg
+		replace := image.NewRGBA(old.Bounds())
+		draw.Draw(replace,old.Bounds(),old,image.ZP,draw.Src)
+		srcImg = replace
+	}
 
-	img := image.NewRGBA(image.Rect(0, 0, 150, 30))
-	draw.Draw(img, img.Bounds(), image.Black, image.ZP, draw.Src)
-	unscii.Font.DrawString(img, 10, 10, "Hello, World!", color.White)
+	//img := image.NewRGBA(image.Rect(0, 0, 150, 30))
+	//draw.Draw(img, img.Bounds(), image.Black, image.ZP, draw.Src)
+	//unscii.Font.DrawString(img, 10, 10, "Hello, World!", color.White)
 	//pixfont.DrawString(img, 10, 10, "Hello, World!", color.White)
-	f, _ := os.OpenFile("hello.png", os.O_CREATE|os.O_RDWR, 0644)
-	png.Encode(f, img)
+	//f, _ := os.OpenFile("hello.png", os.O_CREATE|os.O_RDWR, 0644)
+	//png.Encode(f, img)
 
 	fmt.Println("matcher…")
 
 	pal := pickPalette(srcImg, 64)
+
 	cells,expectCells := sliceImage(srcImg, image.Rect(0, 0, 8, 8),pal)
 	_, store := fontMap(unscii.Font)
+
 
 	//output := image.NewPaletted(srcImg.Bounds(),pal)
 	output := image.NewRGBA(srcImg.Bounds())
@@ -51,8 +58,9 @@ func main() {
 
 	bar := pb.StartNew(expectCells)
 	for cell := range cells {
-		m := findBestStructure(cell.Image,store)
-		unscii.Font.DrawRune(output,cell.Bounds.Min.X,cell.Bounds.Min.Y,rune(m.ID.(int32)),color.White)
+		m,bg,fg := findBestStructure(cell.Image,store)
+		draw.Draw(output,cell.Bounds,image.NewUniform(bg),image.ZP,draw.Src)
+		unscii.Font.DrawRune(output,cell.Bounds.Min.X,cell.Bounds.Min.Y,rune(m.ID.(int32)),fg)
 		//draw.Draw(output,cell.Bounds,cell.Image,cell.Image.Bounds().Min,draw.Src)
 		bar.Increment()
 	}

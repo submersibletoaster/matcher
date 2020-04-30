@@ -22,3 +22,8 @@ For each cell
   * make a black on white and white on black version of the cell's pixels
   * compare silhouette to each font glyph looking for the closest image structure
   * emit an ANSI sequence for fg,bg and the best matching glyph
+
+# Vendoring
+
+Adjust pixmap.PixFont to expose it's charmap
+Adjust duplo to use a smaller image tile for matching db
