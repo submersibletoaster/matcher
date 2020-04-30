@@ -45,6 +45,7 @@ func main() {
 	//png.Encode(f, img)
 
 	fmt.Println("matcher…")
+	fmt.Printf("duplo.ImageScale is %d\n", duplo.ImageScale )
 
 	pal := pickPalette(srcImg, 64)
 
@@ -56,9 +57,13 @@ func main() {
 	output := image.NewRGBA(srcImg.Bounds())
 	draw.Draw(output,output.Bounds(),image.Black,image.ZP, draw.Src)
 
+	
 	bar := pb.StartNew(expectCells)
+	diverse := make(map[string]uint)
 	for cell := range cells {
 		m,bg,fg := findBestStructure(cell.Image,store)
+		char := string(rune(m.ID.(int32)))
+		diverse[char]++
 		draw.Draw(output,cell.Bounds,image.NewUniform(bg),image.ZP,draw.Src)
 		unscii.Font.DrawRune(output,cell.Bounds.Min.X,cell.Bounds.Min.Y,rune(m.ID.(int32)),fg)
 		//draw.Draw(output,cell.Bounds,cell.Image,cell.Image.Bounds().Min,draw.Src)
@@ -66,8 +71,7 @@ func main() {
 	}
 	bar.Finish()
 	preview.Image(output)
-	fmt.Printf("Image store: %p\n",store)
-
+	fmt.Printf("Diversity: %+v",diverse)
 
 }
 

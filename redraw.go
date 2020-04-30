@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	//"image/draw"
 	"github.com/Nykakin/quantize"
 	"github.com/rivo/duplo"
@@ -46,6 +47,7 @@ func findBestStructure(cell image.Image,store *duplo.Store) (*duplo.Match,color.
 	// *actual* representative colours
 	bgCol := monoPal[0]
 	fgCol := monoPal[1]
+	// clobber with black/white to match the glyph database
 	monoPal[0] = color.RGBA{0,0,0,255}
 	monoPal[1] = color.RGBA{255,255,255,255}
 	if ! shown {
@@ -53,10 +55,6 @@ func findBestStructure(cell image.Image,store *duplo.Store) (*duplo.Match,color.
 		fmt.Printf("MonoImg: %v\n", monoImg)
 		shown = true
 	}
-	// clobber the colours for structure matching with black+white glyph
-
-
-
 
 
 	hash,_ := duplo.CreateHash(monoImg)
@@ -64,7 +62,22 @@ func findBestStructure(cell image.Image,store *duplo.Store) (*duplo.Match,color.
 	//hash,_ := duplo.CreateHash(cell)
 	matches := store.Query(hash)
 	sort.Sort(matches)
+	//d,n := fgDensity(monoImg.(*image.Paletted))
+	//fmt.Printf("density: %d ; %s ; %2.2f\n", d, string(rune(matches[0].ID.(int32))), n )
 	return matches[0],bgCol,fgCol
+}
 
+func fgDensity(src *image.Paletted) (count uint,norm float64) {
+	limit := src.Bounds().Dx() * src.Bounds().Dy()
+	count = 0
+	for _,v := range src.Pix {
+		count += uint(v)
+	}
+	return count, float64(count)/float64(limit)
+}
+
+
+func writeANSI(w io.Writer,cells chan Cell) () {
 
 }
+

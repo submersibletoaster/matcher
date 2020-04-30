@@ -36,7 +36,7 @@ func sliceImage(img image.Image, cell image.Rectangle,p color.Palette) (chan Cel
 	draw.Draw(cutFrom, cutFrom.Rect, img, size.Min, draw.Over)
 
 
-	results := make(chan Cell)
+	results := make(chan Cell,4)
 	go func() {
 		yStep := glyphY
 		xStep := glyphX
