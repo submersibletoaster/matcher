@@ -12,10 +12,11 @@ import (
 	"image/png"
 	"io/ioutil"
 	"os"
-	"sort"
 
 	"github.com/rivo/duplo"
-	"github.com/joshdk/preview"
+
+	        "github.com/joshdk/preview"
+
 )
 
 var cellX = flag.Int("w", 8, "Cell width")
@@ -24,7 +25,6 @@ var cellY = flag.Int("h", 8, "Cell height")
 func main() {
 	flag.Parse()
 
-	//
 	srcFile := flag.Arg(0)
 	srcIo, err := os.Open(srcFile)
 	srcImg, _, err := image.Decode(srcIo)
@@ -38,21 +38,35 @@ func main() {
 	//pixfont.DrawString(img, 10, 10, "Hello, World!", color.White)
 	f, _ := os.OpenFile("hello.png", os.O_CREATE|os.O_RDWR, 0644)
 	png.Encode(f, img)
+
 	fmt.Println("matcher…")
 
 	pal := pickPalette(srcImg, 64)
 	cells := sliceImage(srcImg, image.Rect(0, 0, 8, 8),pal)
-
 	_, store := fontMap(unscii.Font)
-	srcHash, _ := duplo.CreateHash(srcImg)
-	matches := store.Query(srcHash)
-	sort.Sort(matches)
-	fmt.Printf("Top match:\t%+v\n", matches[0])
+
+	//output := image.NewPaletted(srcImg.Bounds(),pal)
+	output := image.NewRGBA(srcImg.Bounds())
+	draw.Draw(output,output.Bounds(),image.Black,image.ZP, draw.Src)
+
+	numcells := 0
+	for cell := range cells {
+		m := findBestStructure(cell.Image,store)
+		unscii.Font.DrawRune(output,cell.Bounds.Min.X,cell.Bounds.Min.Y,rune(m.ID.(int32)),color.White)
+		//draw.Draw(output,cell.Bounds,cell.Image,cell.Image.Bounds().Min,draw.Src)
+		numcells++
+	}
+	preview.Image(output)
+	fmt.Printf("Rendered cells: %d\n",numcells)
+	fmt.Printf("Image store: %p\n",store)
+
 
 }
 
 type Lookup map[rune]*image.RGBA
 
+// fontMap generate a lookup of rune -> image of glyph and a duplo.Store
+//  (possibly cached) which contains all the images keyed by their rune
 func fontMap(font *pixfont.PixFont) (Lookup, *duplo.Store) {
 
 	// We can cache these based on font not changing

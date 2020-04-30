@@ -5,7 +5,9 @@ import (
 	"image"
 	"image/color"
 	"github.com/Nykakin/quantize"
-	//"github.com/joshdk/preview"
+	"github.com/rivo/duplo"
+	"sort"
+	"github.com/joshdk/preview"
 )
 
 func pickPalette(img image.Image,num int) (color.Palette) {
@@ -21,6 +23,20 @@ func pickPalette(img image.Image,num int) (color.Palette) {
 	}
 
 	// Display our new palette
-	//preview.Show(palette)
+	if false {
+		preview.Show(palette)
+	}
 	return palette
+}
+
+
+func findBestStructure(cell image.Image,store *duplo.Store) (*duplo.Match) {
+	// github.com/disintegration/imaging
+	//inverted := draw.Invert(cell)
+	hash,_ := duplo.CreateHash(cell)
+	matches := store.Query(hash)
+	sort.Sort(matches)
+	return matches[0]
+
+
 }
