@@ -17,7 +17,7 @@ type Cell struct {
 	Bounds	image.Rectangle
 }
 
-func sliceImage(img image.Image, cell image.Rectangle,p color.Palette) chan Cell{
+func sliceImage(img image.Image, cell image.Rectangle,p color.Palette) (chan Cell, int){
 	size := img.Bounds()
 
 	cellX := size.Dx() / cell.Dx()
@@ -51,6 +51,6 @@ func sliceImage(img image.Image, cell image.Rectangle,p color.Palette) chan Cell
 		}
 		close(results)
 	}()
-	return results
+	return results,cellX*cellY
 }
 

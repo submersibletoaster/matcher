@@ -42,22 +42,22 @@ func main() {
 	fmt.Println("matcher…")
 
 	pal := pickPalette(srcImg, 64)
-	cells := sliceImage(srcImg, image.Rect(0, 0, 8, 8),pal)
+	cells,expectCells := sliceImage(srcImg, image.Rect(0, 0, 8, 8),pal)
 	_, store := fontMap(unscii.Font)
 
 	//output := image.NewPaletted(srcImg.Bounds(),pal)
 	output := image.NewRGBA(srcImg.Bounds())
 	draw.Draw(output,output.Bounds(),image.Black,image.ZP, draw.Src)
 
-	numcells := 0
+	bar := pb.StartNew(expectCells)
 	for cell := range cells {
 		m := findBestStructure(cell.Image,store)
 		unscii.Font.DrawRune(output,cell.Bounds.Min.X,cell.Bounds.Min.Y,rune(m.ID.(int32)),color.White)
 		//draw.Draw(output,cell.Bounds,cell.Image,cell.Image.Bounds().Min,draw.Src)
-		numcells++
+		bar.Increment()
 	}
+	bar.Finish()
 	preview.Image(output)
-	fmt.Printf("Rendered cells: %d\n",numcells)
 	fmt.Printf("Image store: %p\n",store)
 
 
