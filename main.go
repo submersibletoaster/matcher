@@ -3,23 +3,28 @@ package main
 import (
 	"flag"
 	"fmt"
-	pb "github.com/cheggaaa/pb/v3"
-	"github.com/pbnjay/pixfont"
-	"github.com/submersibletoaster/matcher/unscii"
 	"image"
 	"image/color"
 	"image/draw"
 	_ "image/png"
 	"io/ioutil"
 	"os"
+
+	pb "github.com/cheggaaa/pb/v3"
+	"github.com/pbnjay/pixfont"
 	"github.com/rivo/duplo"
-
-	        "github.com/joshdk/preview"
-
+	"github.com/submersibletoaster/matcher/unscii"
 )
 
 var cellX = flag.Int("w", 8, "Cell width")
-var cellY = flag.Int("h", 8, "Cell height")
+var cellY = flag.Int("h", 16, "Cell height")
+
+var myFont *pixfont.PixFont
+var fontStore *duplo.Store
+func init(){
+	myFont = unscii.Font
+	_, fontStore = fontMap(myFont)
+}
 
 func main() {
 	flag.Parse()
@@ -33,7 +38,7 @@ func main() {
 	if srcImg.ColorModel() != color.RGBAModel {
 		old := srcImg
 		replace := image.NewRGBA(old.Bounds())
-		draw.Draw(replace,old.Bounds(),old,image.ZP,draw.Src)
+		draw.Draw(replace, old.Bounds(), old, image.ZP, draw.Src)
 		srcImg = replace
 	}
 
@@ -45,34 +50,37 @@ func main() {
 	//png.Encode(f, img)
 
 	fmt.Println("matcher…")
-	fmt.Printf("duplo.ImageScale is %d\n", duplo.ImageScale )
+	fmt.Printf("duplo.ImageScale is %d\n", duplo.ImageScale)
 
 	pal := pickPalette(srcImg, 64)
 
-	cells,expectCells := sliceImage(srcImg, image.Rect(0, 0, 8, 8),pal)
-	_, store := fontMap(unscii.Font)
+	// TODO - be able to downsample rather than register the font glyph size directly as cell-size
+	cells, expectCells := sliceImage(srcImg, image.Rect(0, 0, *cellX, *cellY), pal)
 
 
-	//output := image.NewPaletted(srcImg.Bounds(),pal)
-	output := image.NewRGBA(srcImg.Bounds())
-	draw.Draw(output,output.Bounds(),image.Black,image.ZP, draw.Src)
-
-	
 	bar := pb.StartNew(expectCells)
+	output := image.NewRGBA(srcImg.Bounds())
 	diverse := make(map[string]uint)
+	cb := func(c string,bg color.Color,fg color.Color) {
+		bar.Increment()
+		diverse[c]++
+	}
+	previewImage(output,cells,cb)
+
+	/*
 	for cell := range cells {
-		m,bg,fg := findBestStructure(cell.Image,store)
+		m, bg, fg := findBestStructure(cell.Image, fontStore)
 		char := string(rune(m.ID.(int32)))
 		diverse[char]++
-		draw.Draw(output,cell.Bounds,image.NewUniform(bg),image.ZP,draw.Src)
-		unscii.Font.DrawRune(output,cell.Bounds.Min.X,cell.Bounds.Min.Y,rune(m.ID.(int32)),fg)
+		draw.Draw(output, cell.Bounds, image.NewUniform(bg), image.ZP, draw.Src)
+		myFont.DrawRune(output, cell.Bounds.Min.X, cell.Bounds.Min.Y, rune(m.ID.(int32)), fg)
 		//draw.Draw(output,cell.Bounds,cell.Image,cell.Image.Bounds().Min,draw.Src)
 		bar.Increment()
 	}
 	bar.Finish()
 	preview.Image(output)
-	fmt.Printf("Diversity: %+v",diverse)
-
+	fmt.Printf("Diversity: %+v", diverse)
+	*/
 }
 
 type Lookup map[rune]*image.RGBA
@@ -107,7 +115,7 @@ func fontMap(font *pixfont.PixFont) (Lookup, *duplo.Store) {
 
 	lookup := Lookup{}
 	bar := pb.StartNew(len(unscii.CharMap))
-	for r, _ := range unscii.CharMap {
+	for r := range unscii.CharMap {
 		_, width := font.MeasureRune(rune(r))
 		img := image.NewRGBA(image.Rect(0, 0, width, font.GetHeight()))
 		draw.Draw(img, img.Bounds(), image.Black, image.ZP, draw.Src)
