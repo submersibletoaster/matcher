@@ -28,7 +28,6 @@ func init(){
 
 func main() {
 	flag.Parse()
-
 	srcFile := flag.Arg(0)
 	srcIo, err := os.Open(srcFile)
 	srcImg, _, err := image.Decode(srcIo)
@@ -58,14 +57,16 @@ func main() {
 	cells, expectCells := sliceImage(srcImg, image.Rect(0, 0, *cellX, *cellY), pal)
 
 
-	bar := pb.StartNew(expectCells)
-	output := image.NewRGBA(srcImg.Bounds())
+	//bar := pb.StartNew(expectCells)
+
 	diverse := make(map[string]uint)
 	cb := func(c string,bg color.Color,fg color.Color) {
-		bar.Increment()
+		//bar.Increment()
 		diverse[c]++
 	}
-	previewImage(output,cells,cb)
+	//previewImage(image.NewRGBA(srcImg.Bounds()),cells,cb)
+	writeANSI(os.Stdout,cells,cb)
+	//bar.Finish()
 
 	/*
 	for cell := range cells {
@@ -79,8 +80,10 @@ func main() {
 	}
 	bar.Finish()
 	preview.Image(output)
-	fmt.Printf("Diversity: %+v", diverse)
 	*/
+
+	fmt.Printf("Diversity: %+v\n", diverse)
+	fmt.Printf("Cells: %d\n",expectCells)
 }
 
 type Lookup map[rune]*image.RGBA
@@ -116,6 +119,9 @@ func fontMap(font *pixfont.PixFont) (Lookup, *duplo.Store) {
 	lookup := Lookup{}
 	bar := pb.StartNew(len(unscii.CharMap))
 	for r := range unscii.CharMap {
+		// Borrowed from unscii/bm2uns-prebuild.pl selection of glyphs
+		if((r==0x20 || (r>=0x2400 && r<=0x2bff) || (r>=0xe081 && r<=0xebff)) && (r!=0x25fd && r!=0x25fe && r!=0x2615 && r!=0x26aa && r!=0x26ab && r!=0x26f5 && r!=0x2b55)) {
+
 		_, width := font.MeasureRune(rune(r))
 		img := image.NewRGBA(image.Rect(0, 0, width, font.GetHeight()))
 		draw.Draw(img, img.Bounds(), image.Black, image.ZP, draw.Src)
@@ -125,8 +131,11 @@ func fontMap(font *pixfont.PixFont) (Lookup, *duplo.Store) {
 			store.Add(rune(r), hash)
 		}
 		lookup[rune(r)] = img
+	}
 		bar.Increment()
+
 	}
 	bar.Finish()
+	fmt.Fprintf(os.Stderr,"Used %d unscii runes\n",len(lookup))
 	return lookup, store
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/Nykakin/quantize"
 	"github.com/joshdk/preview"
 	"github.com/rivo/duplo"
+	ansi "github.com/gookit/color"
 )
 
 // Pick the overall image palette
@@ -85,11 +86,32 @@ func fgDensity(src *image.Paletted) (count uint, norm float64) {
 	return count, float64(count) / float64(limit)
 }
 
-func writeANSI(w io.Writer, cells chan Cell) {
+type RenderCB func(string,color.Color,color.Color)
+
+func writeANSI(w io.Writer, cells chan Cell,cb RenderCB) {
+	for cell := range cells {
+		m,bg,fg := findBestStructure(cell.Image, fontStore)
+		cSeq := ansi.NewRGBStyle(toANSI(fg),toANSI(bg))
+		char := string(rune(m.ID.(int32)))
+
+		if cell.Bounds.Min.X == 0 {
+			//fmt.Fprint(w,"\n")
+			fmt.Print("\033[0m\n")
+		}
+		cb(char,fg,bg)
+		cSeq.Print(char)
+		_ = cSeq
+	}
 
 }
 
-func previewImage(output draw.Image, cells chan Cell,cb func(string,color.Color,color.Color)) {
+func toANSI(in color.Color) (out ansi.RGBColor) {
+	r,g,b,_ := in.RGBA()
+	out = ansi.RGBColor{uint8(r), uint8(g), uint8(b), 0}
+	return
+}
+
+func previewImage(output draw.Image, cells chan Cell,cb RenderCB) {
 	draw.Draw(output, output.Bounds(), image.Black, image.ZP, draw.Src)
 	for cell := range cells {
 		m, bg, fg := findBestStructure(cell.Image, fontStore)
@@ -100,3 +122,5 @@ func previewImage(output draw.Image, cells chan Cell,cb func(string,color.Color,
 	}
 	preview.Image(output)
 }
+
+
