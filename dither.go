@@ -1,11 +1,11 @@
-package main
+package matcher
 
 import (
-	"github.com/esimov/colorquant"
 	"image"
 	"image/color"
-)
 
+	"github.com/esimov/colorquant"
+)
 
 var dither map[string]colorquant.Dither = map[string]colorquant.Dither{
 	"FloydSteinberg": colorquant.Dither{
@@ -60,9 +60,8 @@ var dither map[string]colorquant.Dither = map[string]colorquant.Dither{
 	},
 }
 
-
-func ditherToPalette(src image.Image,pal color.Palette, n int) (image.Image) {
+func DitherToPalette(src image.Image, pal color.Palette, n int) image.Image {
 	b := src.Bounds()
-	dst := image.NewPaletted(image.Rect(0,0,b.Dx(),b.Dy()),pal)
-	return dither["FloydSteinberg"].Quantize(src,dst,n,true,true)
+	dst := image.NewPaletted(image.Rect(0, 0, b.Dx(), b.Dy()), pal)
+	return dither["Stucki"].Quantize(src, dst, n, true, true)
 }

@@ -1,4 +1,4 @@
-package main
+package matcher
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ type Cell struct {
 	Bounds image.Rectangle
 }
 
-func sliceImage(img image.Image, cell image.Rectangle, p color.Palette) (chan Cell, int) {
+func SliceImage(img image.Image, cell image.Rectangle, p color.Palette) (chan Cell, int) {
 	size := img.Bounds()
 
 	cellX := size.Dx() / cell.Dx()

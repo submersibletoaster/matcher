@@ -1,4 +1,4 @@
-package main
+package matcher
 
 import (
 	"fmt"
@@ -11,13 +11,13 @@ import (
 	"sort"
 
 	"github.com/Nykakin/quantize"
+	ansi "github.com/gookit/color"
 	"github.com/joshdk/preview"
 	"github.com/rivo/duplo"
-	ansi "github.com/gookit/color"
 )
 
 // Pick the overall image palette
-func pickPalette(img image.Image, num int) color.Palette {
+func PickPalette(img image.Image, num int) color.Palette {
 	q := quantize.NewHierarhicalQuantizer()
 	colors, err := q.Quantize(img, num)
 	if err != nil {
@@ -38,13 +38,13 @@ func pickPalette(img image.Image, num int) color.Palette {
 
 var shown bool = false
 
-func findBestStructure(cell image.Image, store *duplo.Store) (*duplo.Match, color.Color, color.Color) {
+func FindBestStructure(cell image.Image, store *duplo.Store) (*duplo.Match, color.Color, color.Color) {
 	// github.com/disintegration/imaging
 	//inverted := draw.Invert(cell)
-	monoPal := pickPalette(cell, 2)
+	monoPal := PickPalette(cell, 2)
 	//monoImg := image.NewPaletted(cell.Bounds(),monoPal)
 	//draw.Draw(monoImg,cell.Bounds(),cell,image.ZP,draw.Src)
-	monoImg := ditherToPalette(cell, monoPal, 2)
+	monoImg := DitherToPalette(cell, monoPal, 2)
 
 	// *actual* representative colours
 	bgCol := monoPal[0]
@@ -86,19 +86,19 @@ func fgDensity(src *image.Paletted) (count uint, norm float64) {
 	return count, float64(count) / float64(limit)
 }
 
-type RenderCB func(string,color.Color,color.Color)
+type RenderCB func(string, color.Color, color.Color)
 
-func writeANSI(w io.Writer, cells chan Cell,cb RenderCB) {
+func WriteANSI(w io.Writer, cells chan Cell, cb RenderCB) {
 	for cell := range cells {
-		m,bg,fg := findBestStructure(cell.Image, fontStore)
-		cSeq := ansi.NewRGBStyle(toANSI(fg),toANSI(bg))
+		m, bg, fg := FindBestStructure(cell.Image, fontStore)
+		cSeq := ansi.NewRGBStyle(toANSI(fg), toANSI(bg))
 		char := string(rune(m.ID.(int32)))
 
 		if cell.Bounds.Min.X == 0 {
 			//fmt.Fprint(w,"\n")
 			fmt.Print("\033[0m\n")
 		}
-		cb(char,fg,bg)
+		cb(char, fg, bg)
 		cSeq.Print(char)
 		_ = cSeq
 	}
@@ -106,21 +106,19 @@ func writeANSI(w io.Writer, cells chan Cell,cb RenderCB) {
 }
 
 func toANSI(in color.Color) (out ansi.RGBColor) {
-	r,g,b,_ := in.RGBA()
+	r, g, b, _ := in.RGBA()
 	out = ansi.RGBColor{uint8(r), uint8(g), uint8(b), 0}
 	return
 }
 
-func previewImage(output draw.Image, cells chan Cell,cb RenderCB) {
+func PreviewImage(output draw.Image, cells chan Cell, cb RenderCB) {
 	draw.Draw(output, output.Bounds(), image.Black, image.ZP, draw.Src)
 	for cell := range cells {
-		m, bg, fg := findBestStructure(cell.Image, fontStore)
+		m, bg, fg := FindBestStructure(cell.Image, fontStore)
 		char := string(rune(m.ID.(int32)))
 		draw.Draw(output, cell.Bounds, image.NewUniform(bg), image.ZP, draw.Src)
 		myFont.DrawRune(output, cell.Bounds.Min.X, cell.Bounds.Min.Y, rune(m.ID.(int32)), fg)
-		cb(char,bg,fg)
+		cb(char, bg, fg)
 	}
 	preview.Image(output)
 }
-
-
