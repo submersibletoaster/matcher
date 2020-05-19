@@ -12,7 +12,7 @@ binmode STDOUT, ":utf8";
 
 while ($_ = <STDIN>) {
 	$count++;
-	next if length($_) > $ARGV[0];
+	next if length($_) != $ARGV[0];
 	print $_;
 
 }
