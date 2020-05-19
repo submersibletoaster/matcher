@@ -5,75 +5,157 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"io/ioutil"
 	"os"
+	"sort"
 
 	pb "github.com/cheggaaa/pb/v3"
 	"github.com/pbnjay/pixfont"
-	"github.com/rivo/duplo"
+	"github.com/steakknife/hamming"
 	"github.com/submersibletoaster/matcher/unscii"
 )
 
+const (
+	version = 1.0
+)
+
+type Lookup map[string]image.PalettedImage
+
+/*
+type DStore struct {
+	density [][]string
+	lut     *Lookup
+}
+
+func (*DStore) Query(q *image.PalettedImage) []DMatch {
+	d, nd := fgDensity(q)
+	best := q.Bounds().Dx * q.Bounds().Dy
+
+	for {
+
+	}
+}
+
+type DMatch struct {
+	score float32
+	id    rune
+}
+*/
+
 var myFont *pixfont.PixFont
 
-// duplo image similarity store
-var fontStore *duplo.Store
+var density [][]string
+var lookup Lookup
 
 func init() {
 	myFont = unscii.Font
-	_, fontStore = fontMap(myFont)
+	lookup = fontMap(myFont)
+	density = densityMap(lookup)
 }
 
-type Lookup map[rune]*image.RGBA
+func GetLookup() Lookup {
+	return lookup
+}
 
-// fontMap generate a lookup of rune -> image of glyph and a duplo.Store
-//  (possibly cached) which contains all the images keyed by their rune
-func fontMap(font *pixfont.PixFont) (Lookup, *duplo.Store) {
+func GetFont() *pixfont.PixFont {
+	return myFont
+}
 
-	// We can cache these based on font not changing
-	haveCached := false
-	cacheFile, err := os.Open(".duplo.cache")
-	store := duplo.New()
-	if os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "No duplo cache for matching: %s\n", err)
-		defer func() {
-			out, err := store.GobEncode()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to write duplo cache: %s", err)
-			} else {
-				ioutil.WriteFile(".duplo.cache", out, 0664)
-			}
-		}()
-	} else {
-		in, err := ioutil.ReadAll(cacheFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to open duplo cache: %s", err)
-		} else {
-			store.GobDecode(in)
-			haveCached = true
-		}
-	}
+func GetDensity() [][]string {
+	return density
+}
 
+// fontMap generate a lookup of rune -> image of glyph
+// which contains all the images keyed by their rune
+func fontMap(font *pixfont.PixFont) Lookup {
+
+	pal := color.Palette([]color.Color{color.RGBA{0, 0, 0, 255}, color.RGBA{255, 255, 255, 255}})
 	lookup := Lookup{}
-	bar := pb.StartNew(len(unscii.CharMap))
-	for r := range unscii.CharMap {
-		// Borrowed from unscii/bm2uns-prebuild.pl selection of glyphs
-		if (r == 0x20 || (r >= 0x2400 && r <= 0x2bff) || (r >= 0xe081 && r <= 0xebff)) && (r != 0x25fd && r != 0x25fe && r != 0x2615 && r != 0x26aa && r != 0x26ab && r != 0x26f5 && r != 0x2b55) {
-
+	bar := pb.StartNew(len(unscii.CharMap()))
+	for r := range unscii.CharMap() {
+		if usablePoint(r) {
 			_, width := font.MeasureRune(rune(r))
-			img := image.NewRGBA(image.Rect(0, 0, width, font.GetHeight()))
+			//img := image.NewRGBA(image.Rect(0, 0, width, font.GetHeight()))
+			img := image.NewPaletted(image.Rect(0, 0, width, font.GetHeight()), pal)
 			draw.Draw(img, img.Bounds(), image.Black, image.ZP, draw.Src)
 			unscii.Font.DrawRune(img, 0, 0, rune(r), color.White)
-			if !haveCached {
-				hash, _ := duplo.CreateHash(img)
-				store.Add(rune(r), hash)
-			}
-			lookup[rune(r)] = img
+			lookup[string(rune(r))] = img
 		}
 		bar.Increment()
 
 	}
 	bar.Finish()
 	fmt.Fprintf(os.Stderr, "Used %d unscii runes\n", len(lookup))
-	return lookup, store
+	return lookup
+}
+
+func usablePoint(r int32) bool {
+	// Borrowed from unscii/bm2uns-prebuild.pl selection of glyphs
+	if (r == 0x20 || (r >= 0x2400 && r <= 0x2bff) || (r >= 0xe081 && r <= 0xebff)) && (r != 0x25fd && r != 0x25fe && r != 0x2615 && r != 0x26aa && r != 0x26ab && r != 0x26f5 && r != 0x2b55) {
+		return true
+	}
+	return false
+
+}
+
+func densityMap(lut Lookup) [][]string {
+	result := make([][]string, 256)
+	count := 0
+	for r, img := range lut {
+		density := countPixels(img)
+		if len(result[density]) == 0 {
+			result[density] = make([]string, 0)
+		}
+		result[density] = append(result[density], r)
+		count++
+	}
+	for d, runes := range result {
+		if len(runes) == 0 {
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "%d\t%#v\n", d, runes)
+	}
+
+	return result
+}
+
+func countPixels(img image.PalettedImage) (result uint32) {
+
+	b := img.Bounds()
+	for x := b.Min.X; x < b.Max.X; x++ {
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			c := img.ColorIndexAt(x, y)
+			result += uint32(c)
+		}
+	}
+	return result
+}
+
+type Match struct {
+	Score float32
+	Char  string
+}
+
+type Results []Match
+
+func (r Results) Swap(i, j int) {
+	r[j], r[i] = r[i], r[j]
+}
+func (r Results) Less(i, j int) bool {
+	return r[i].Score < r[j].Score
+}
+func (r Results) Len() int {
+	return len(r)
+}
+
+func Closest(cel image.PalettedImage, chars []string) string {
+	var matches Results
+	max := float32(cel.Bounds().Dx() * cel.Bounds().Dy())
+	for _, c := range chars {
+		f := lookup[c]
+		dist := hamming.Uint8s(cel.(*image.Paletted).Pix, f.(*image.Paletted).Pix)
+		matches = append(matches, Match{float32(dist) / max, c})
+	}
+	sort.Sort(matches)
+	//fmt.Fprintf(os.Stderr, "%+v\n", matches)
+	return matches[0].Char
 }

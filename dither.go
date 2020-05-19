@@ -7,6 +7,8 @@ import (
 	"github.com/esimov/colorquant"
 )
 
+var ThresholdPalette = color.Palette{color.RGBA{0, 0, 0, 255}, color.RGBA{255, 255, 255, 255}}
+
 var dither map[string]colorquant.Dither = map[string]colorquant.Dither{
 	"FloydSteinberg": colorquant.Dither{
 		[][]float32{
@@ -63,5 +65,11 @@ var dither map[string]colorquant.Dither = map[string]colorquant.Dither{
 func DitherToPalette(src image.Image, pal color.Palette, n int) image.Image {
 	b := src.Bounds()
 	dst := image.NewPaletted(image.Rect(0, 0, b.Dx(), b.Dy()), pal)
-	return dither["Stucki"].Quantize(src, dst, n, true, true)
+	return dither["Sierra-3"].Quantize(src, dst, n, true, true)
+}
+
+func QuantizeToPalette(src image.Image, pal color.Palette, n int) image.Image {
+	b := src.Bounds()
+	dst := image.NewPaletted(image.Rect(0, 0, b.Dx(), b.Dy()), pal)
+	return colorquant.NoDither.Quantize(src, dst, n, false, true)
 }

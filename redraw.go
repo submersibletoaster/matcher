@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"io"
 
 	//"image/draw"
-	"sort"
 
 	"github.com/Nykakin/quantize"
 	ansi "github.com/gookit/color"
 	"github.com/joshdk/preview"
-	"github.com/rivo/duplo"
 )
 
 // Pick the overall image palette
@@ -38,6 +35,7 @@ func PickPalette(img image.Image, num int) color.Palette {
 
 var shown bool = false
 
+/*
 func FindBestStructure(cell image.Image, store *duplo.Store) (*duplo.Match, color.Color, color.Color) {
 	// github.com/disintegration/imaging
 	//inverted := draw.Invert(cell)
@@ -76,23 +74,68 @@ func FindBestStructure(cell image.Image, store *duplo.Store) (*duplo.Match, colo
 	//fmt.Printf("density: %d ; %s ; %2.2f\n", d, string(rune(matches[0].ID.(int32))), n )
 	return matches[0], bgCol, fgCol
 }
+*/
 
-func fgDensity(src *image.Paletted) (count uint, norm float64) {
-	limit := src.Bounds().Dx() * src.Bounds().Dy()
+func FindBestMatch(cell image.Image, dm [][]string) (string, color.Color, color.Color) {
+	monoPal := PickPalette(cell, 2)
+	monoImg := DitherToPalette(cell, monoPal, 2)
+	monoBW := monoImg.(*image.Paletted)
+	// *actual* representative colours
+	bgCol := monoPal[0]
+	fgCol := monoPal[1]
+
+	// clobber with black/white to match the glyph database
+	monoPal[0] = color.RGBA{0, 0, 0, 255}
+	monoPal[1] = color.RGBA{255, 255, 255, 255}
+	monoBW.Palette = monoPal
+	cellFgDensity, limit, _ := fgDensity(monoBW)
+
+	out := ""
+	bg := bgCol
+	fg := fgCol
+	goal := cellFgDensity
+	for {
+		if len(dm[goal]) > 0 {
+			out = Closest(monoBW, dm[goal])
+			bg = bgCol
+			fg = fgCol
+			break
+		} else if len(dm[limit-goal]) > 0 {
+			out = Closest(monoBW, dm[limit-goal])
+			bg = fgCol
+			fg = bgCol
+			break
+		}
+		goal--
+		if goal < 0 {
+			out = " "
+			bg = bgCol
+			fg = fgCol
+			break
+		}
+
+	}
+
+	//fmt.Fprintf(os.Stderr, "'%s'\n", out)
+	return out, bg, fg
+	//return rune(0x2318), bgCol, fgCol
+}
+
+func fgDensity(src *image.Paletted) (count uint, limit uint, norm float64) {
+	limit = uint(src.Bounds().Dx() * src.Bounds().Dy())
 	count = 0
 	for _, v := range src.Pix {
 		count += uint(v)
 	}
-	return count, float64(count) / float64(limit)
+	return count, limit, float64(count) / float64(limit)
 }
 
 type RenderCB func(string, color.Color, color.Color)
 
 func WriteANSI(w io.Writer, cells chan Cell, cb RenderCB) {
 	for cell := range cells {
-		m, bg, fg := FindBestStructure(cell.Image, fontStore)
+		char, bg, fg := FindBestMatch(cell.Image, density)
 		cSeq := ansi.NewRGBStyle(toANSI(fg), toANSI(bg))
-		char := string(rune(m.ID.(int32)))
 
 		if cell.Bounds.Min.X == 0 {
 			//fmt.Fprint(w,"\n")
@@ -102,7 +145,6 @@ func WriteANSI(w io.Writer, cells chan Cell, cb RenderCB) {
 		cSeq.Print(char)
 		_ = cSeq
 	}
-
 }
 
 func toANSI(in color.Color) (out ansi.RGBColor) {
@@ -111,14 +153,15 @@ func toANSI(in color.Color) (out ansi.RGBColor) {
 	return
 }
 
+/*
 func PreviewImage(output draw.Image, cells chan Cell, cb RenderCB) {
 	draw.Draw(output, output.Bounds(), image.Black, image.ZP, draw.Src)
 	for cell := range cells {
-		m, bg, fg := FindBestStructure(cell.Image, fontStore)
-		char := string(rune(m.ID.(int32)))
+		char, bg, fg := FindBestMatch(cell.Image)
 		draw.Draw(output, cell.Bounds, image.NewUniform(bg), image.ZP, draw.Src)
 		myFont.DrawRune(output, cell.Bounds.Min.X, cell.Bounds.Min.Y, rune(m.ID.(int32)), fg)
 		cb(char, bg, fg)
 	}
 	preview.Image(output)
 }
+*/
