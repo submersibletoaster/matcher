@@ -112,7 +112,7 @@ func densityMap(lut Lookup) [][]string {
 		if len(runes) == 0 {
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "%d\t%#v\n", d, runes)
+		fmt.Fprintf(os.Stderr, "%d\t%v\n", d, runes)
 	}
 
 	return result
@@ -156,6 +156,6 @@ func Closest(cel image.PalettedImage, chars []string) string {
 		matches = append(matches, Match{float32(dist) / max, c})
 	}
 	sort.Sort(matches)
-	//fmt.Fprintf(os.Stderr, "%+v\n", matches)
+	fmt.Fprintf(os.Stderr, "%+v\n", matches)
 	return matches[0].Char
 }

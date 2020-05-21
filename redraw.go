@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"io"
+	"os"
 
 	//"image/draw"
 
@@ -76,9 +78,13 @@ func FindBestStructure(cell image.Image, store *duplo.Store) (*duplo.Match, colo
 }
 */
 
-func FindBestMatch(cell image.Image, dm [][]string) (string, color.Color, color.Color) {
+func FindBestMatch(cell image.Image) (string, color.Color, color.Color) {
+	dm := density
 	monoPal := PickPalette(cell, 2)
-	monoImg := DitherToPalette(cell, monoPal, 2)
+	monoImg := QuantizeToPalette(cell, monoPal, 2)
+	segGray := DynamicThreshold(cell)
+	seg := image.NewPaletted(segGray.Bounds(), ThresholdPalette)
+	draw.Draw(seg, seg.Bounds(), segGray, seg.Bounds().Min, draw.Src)
 	monoBW := monoImg.(*image.Paletted)
 	// *actual* representative colours
 	bgCol := monoPal[0]
@@ -88,20 +94,21 @@ func FindBestMatch(cell image.Image, dm [][]string) (string, color.Color, color.
 	monoPal[0] = color.RGBA{0, 0, 0, 255}
 	monoPal[1] = color.RGBA{255, 255, 255, 255}
 	monoBW.Palette = monoPal
-	cellFgDensity, limit, _ := fgDensity(monoBW)
+	cellFgDensity, limit, _ := fgDensity(seg)
 
 	out := ""
 	bg := bgCol
 	fg := fgCol
 	goal := cellFgDensity
+	fmt.Fprintf(os.Stderr, "goal density: %v\n", goal)
 	for {
 		if len(dm[goal]) > 0 {
-			out = Closest(monoBW, dm[goal])
+			out = Closest(seg, dm[goal])
 			bg = bgCol
 			fg = fgCol
 			break
 		} else if len(dm[limit-goal]) > 0 {
-			out = Closest(monoBW, dm[limit-goal])
+			out = Closest(seg, dm[limit-goal])
 			bg = fgCol
 			fg = bgCol
 			break
@@ -124,7 +131,9 @@ func FindBestMatch(cell image.Image, dm [][]string) (string, color.Color, color.
 func fgDensity(src *image.Paletted) (count uint, limit uint, norm float64) {
 	limit = uint(src.Bounds().Dx() * src.Bounds().Dy())
 	count = 0
+	//fmt.Fprintf(os.Stderr, "%#v\n", src.Pix)
 	for _, v := range src.Pix {
+		//fmt.Fprintf(os.Stderr, "\tpixel: %v\n", v)
 		count += uint(v)
 	}
 	return count, limit, float64(count) / float64(limit)
@@ -134,7 +143,7 @@ type RenderCB func(string, color.Color, color.Color)
 
 func WriteANSI(w io.Writer, cells chan Cell, cb RenderCB) {
 	for cell := range cells {
-		char, bg, fg := FindBestMatch(cell.Image, density)
+		char, bg, fg := FindBestMatch(cell.Image)
 		cSeq := ansi.NewRGBStyle(toANSI(fg), toANSI(bg))
 
 		if cell.Bounds.Min.X == 0 {
