@@ -31,6 +31,10 @@ func (r Results) Len() int {
 	return len(r)
 }
 
+type GlyphInfo struct {
+	image.Paletted
+	uvHash []uint
+}
 type Lookup map[string]image.PalettedImage
 
 type RasterFont struct {
@@ -60,7 +64,9 @@ func imageDensity(src *image.Paletted) (fg, bg uint, norm float64) {
 	return
 }
 
-func uvHash(src *image.Paletted) {
+// uvHash - given a ThresholdPalette image returns a hash
+// of density by column and row
+func uvHash(src *image.Paletted) []uint {
 	b := src.Bounds()
 	column := make([]uint, b.Dx())
 	row := make([]uint, b.Dy())
@@ -71,4 +77,12 @@ func uvHash(src *image.Paletted) {
 			row[y] += uint(v)
 		}
 	}
+	uv := make([]uint, len(column)+len(row))
+	for i, v := range column {
+		uv[i] = v
+	}
+	for i, v := range row {
+		uv[i+len(row)] = v
+	}
+	return uv
 }
