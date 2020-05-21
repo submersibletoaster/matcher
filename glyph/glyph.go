@@ -152,7 +152,10 @@ func (a uvHash) CosineSimilarity(in uvHash) float64 {
 		aSq += a[i] * a[i]
 		bSq += b[i] * b[i]
 	}
-	log.Debugf("%d / (√%d * √%d)\n", numerator, aSq, bSq)
+	//	log.Debugf("%d / (√%d * √%d)\n", numerator, aSq, bSq)
 	similar := float64(numerator) / (math.Sqrt(float64(aSq)) * math.Sqrt(float64(bSq)))
+	if math.IsNaN(similar) {
+		return 0.0
+	}
 	return similar
 }
