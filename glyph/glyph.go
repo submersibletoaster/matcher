@@ -6,7 +6,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/pbnjay/pixfont"
+	"github.com/submersibletoaster/pixfont"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -68,7 +68,7 @@ func (s *RasterFont) makeInfo(chars []rune) {
 		img := image.NewPaletted(image.Rect(0, 0, s.Width, s.Height), ThresholdPalette)
 		s.Font.DrawRune(img, 0, 0, r, image.White)
 		hash := MakeUVHash(img)
-		log.Debugf("%s\t%v\n", string(r), hash)
+		//log.Debugf("%s\t%v\n", string(r), hash)
 		g := GlyphInfo{img, hash, r}
 		s.lutRune[r] = &g
 	}
@@ -87,13 +87,41 @@ func (s RasterFont) ImageForRune(c rune) *image.Paletted {
 func (s RasterFont) Query(src *image.Paletted) (out Results) {
 	srcHash := MakeUVHash(src)
 	for r, info := range s.lutRune {
-		score := srcHash.CosineSimilarity(info.uvHash)
+		similar := srcHash.CosineSimilarity(info.uvHash)
+		_, nDistance := info.HammingDistance(src)
+		if nDistance == 0 {
+			log.Debugf("!! While comparing to '%s' - zero distance\n", string(r))
+		}
+		score := similar * (1.0 - nDistance)
 		//log.Debugf("%s\t%f\n", string(r), score)
 		m := Match{Char: string(r), Rune: r, Score: score, Invert: false}
 		out = append(out, m)
 	}
 	sort.Sort(sort.Reverse(out))
 	return
+}
+
+func (g *GlyphInfo) HammingDistance(src *image.Paletted) (int, float64) {
+	dist := 0
+	limit := 0
+	b := g.Image.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			have := src.ColorIndexAt(x, y)
+			if have != g.Image.ColorIndexAt(x, y) {
+				dist++
+			}
+			limit++
+		}
+
+	}
+	/*if dist == 0 {
+		log.Debugf("\t%v\n", src.Pix)
+		log.Debugf("\t%v\n", g.Image.Pix)
+
+	}
+	*/
+	return dist, float64(dist) / float64(limit)
 }
 
 // count set pixels and return the foreground and background density

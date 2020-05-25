@@ -9,7 +9,7 @@ import (
 	"sort"
 
 	pb "github.com/cheggaaa/pb/v3"
-	"github.com/pbnjay/pixfont"
+	"github.com/submersibletoaster/pixfont"
 	"github.com/steakknife/hamming"
 	"github.com/submersibletoaster/matcher/unscii"
 )
@@ -90,6 +90,16 @@ func fontMap(font *pixfont.PixFont) Lookup {
 
 func usablePoint(r int32) bool {
 	// Borrowed from unscii/bm2uns-prebuild.pl selection of glyphs
+	// (0x20)ASCII space
+	// OR (0x2400 - 0x2bff ; representations of control chars, many drawing chars and line segments, arrows
+	// 		bullets, circles, iching? lots of emoji
+	// OR (0xe081 0xebff ) braille? and block shades, partial blocks, digital style  clock numerals
+	// BUT NOT
+	// 0x25fd,0x25fe filled/empty checkbox?
+	// 0x2615 coffee emoji?
+	// 0x26aa,0x26ab filled circles white,grey
+	// 0x26f5 sailboat
+	// 0x2b55 round red circle ?
 	if (r == 0x20 || (r >= 0x2400 && r <= 0x2bff) || (r >= 0xe081 && r <= 0xebff)) && (r != 0x25fd && r != 0x25fe && r != 0x2615 && r != 0x26aa && r != 0x26ab && r != 0x26f5 && r != 0x2b55) {
 		return true
 	}
