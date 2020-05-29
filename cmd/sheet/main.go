@@ -71,20 +71,9 @@ func main() {
 	// TODO - be able to downsample rather than register the font glyph size directly as cell-size
 	//cells, _ := matcher.SliceImage(srcImg, image.Rect(0, 0, 8, 16), pal)
 	for cell := range cells {
-		/*		quant := matcher.QuantizeToPalette(cell.Image,pal,2)
-				fmt.Fprintf(os.Stderr,"%+v\n", quant.(*image.Paletted).Palette )
-				fmt.Fprintf(os.Stderr,"%+v\n", quant.(*image.Paletted).Pix )
-				fmt.Fprintf(os.Stderr, "%#v\t\n", quant.Bounds())
-				draw.Draw(output, cell.Bounds, quant, image.ZP  , draw.Src)
-		*/
 		seg, bg, fg := cell.DynamicThreshold()
 
 		draw.Draw(thrOut, cell.Origin, seg, seg.Bounds().Min, draw.Src)
-
-		//celPal := matcher.PickPalette(cell.Image, 2)
-		//seg.(*image.Paletted).Palette = celPal
-
-		//c, bg, fg := matcher.FindBestMatch(cell.Image)
 
 		/*
 			results := rasterFont.Query(seg)
