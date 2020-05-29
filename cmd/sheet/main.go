@@ -36,15 +36,17 @@ func main() {
 	black := color.RGBA{0, 0, 0, 255}
 	draw.Draw(i, i.Bounds(), image.NewUniform(black), image.ZP, draw.Src)
 
+	func () {
 	for y := 0; y < r.Max.Y; y += sY {
 		for x := 0; x < r.Max.X; x += sX {
 			font.DrawString(i, x, y, allChars[n], white)
 			n++
 			if n >= chars {
-				break
+				return
 			}
 		}
 	}
+	}()
 
 	w, _ := os.Create("out.png")
 	png.Encode(w, i)
