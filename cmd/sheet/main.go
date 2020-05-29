@@ -7,8 +7,11 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"io"
 	"math"
 	"os"
+
+	ansi "github.com/gookit/color"
 
 	"github.com/submersibletoaster/matcher"
 	"github.com/submersibletoaster/matcher/examine"
@@ -70,6 +73,9 @@ func main() {
 
 	// TODO - be able to downsample rather than register the font glyph size directly as cell-size
 	//cells, _ := matcher.SliceImage(srcImg, image.Rect(0, 0, 8, 16), pal)
+	toTerm := make(chan AnsiOut, 1)
+	go func() { WriteANSI(os.Stderr, toTerm) }()
+
 	for cell := range cells {
 		seg, bg, fg := cell.DynamicThreshold()
 
@@ -91,6 +97,8 @@ func main() {
 		results := rasterFont.Query(seg)
 		c := results[0].Char
 
+		toTerm <- AnsiOut{c, fg, bg, cell.CharPos}
+
 		draw.Draw(output, cell.Origin, image.NewUniform(bg), image.ZP, draw.Src)
 		font.DrawString(output, cell.Origin.Min.X, cell.Origin.Min.Y, c, fg)
 
@@ -108,6 +116,7 @@ func main() {
 			mask, mask.Bounds().Min, draw.Over)
 
 	}
+	close(toTerm)
 
 	ow, _ := os.Create("preview.png")
 	png.Encode(ow, output)
@@ -162,4 +171,30 @@ func makeCharSheet() {
 	png.Encode(w, i)
 	w.Close()
 
+}
+
+type AnsiOut struct {
+	Char   string
+	Fg     color.Color
+	Bg     color.Color
+	CelPos image.Point
+}
+
+func WriteANSI(w io.Writer, chars <-chan AnsiOut) {
+	for cel := range chars {
+		cSeq := ansi.NewRGBStyle(toANSI(cel.Fg), toANSI(cel.Bg))
+
+		if cel.CelPos.X == 0 {
+			//fmt.Fprint(w,"\n")
+			fmt.Print("\033[0m\n")
+		}
+		cSeq.Print(cel.Char)
+		_ = cSeq
+	}
+}
+
+func toANSI(in color.Color) (out ansi.RGBColor) {
+	r, g, b, _ := in.RGBA()
+	out = ansi.RGBColor{uint8(r), uint8(g), uint8(b), 0}
+	return
 }
