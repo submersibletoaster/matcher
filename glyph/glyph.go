@@ -93,20 +93,26 @@ func (s RasterFont) Query(src *image.Paletted) (out Results) {
 	srcHash := MakeUVHash(src)
 	for r, info := range s.lutRune {
 		similar := srcHash.CosineSimilarity(info.uvHash)
-		score := similar
 
 		/*
 			_, nDistance := info.HammingDistance(src)
 			if nDistance == 0 {
 				log.Debugf("!! While comparing to '%s' - zero distance\n", string(r))
 			}
-			score := 1.0 - nDistance
+			log.Debugf("char=%v, similarity = %f , nDist=%f", string(r), similar, nDistance)
+			score := similar + nDistance
 		*/
+
+		score := similar
+
 		//log.Debugf("%s\t%f\n", string(r), score)
 		m := Match{Char: string(r), Rune: r, Score: score, Invert: false}
 		out = append(out, m)
 	}
+
 	sort.Sort(sort.Reverse(out))
+	//log.Debugf("Best: '%s' , %f", out[0].Char, out[0].Score)
+	//sort.Sort(out)
 	return
 }
 
@@ -124,12 +130,7 @@ func (g *GlyphInfo) HammingDistance(src *image.Paletted) (int, float64) {
 		}
 
 	}
-	/*if dist == 0 {
-		log.Debugf("\t%v\n", src.Pix)
-		log.Debugf("\t%v\n", g.Image.Pix)
 
-	}
-	*/
 	return dist, float64(dist) / float64(limit)
 }
 

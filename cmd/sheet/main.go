@@ -13,6 +13,8 @@ import (
 	"sort"
 	"sync"
 
+	_ "golang.org/x/image/webp"
+
 	ansi "github.com/gookit/color"
 
 	"github.com/submersibletoaster/matcher"
@@ -21,8 +23,6 @@ import (
 	"github.com/submersibletoaster/pixfont"
 
 	"github.com/submersibletoaster/matcher/unscii"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var font *pixfont.PixFont
@@ -40,7 +40,7 @@ func init() {
 	}
 	rasterFont = glyph.NewRasterFont(font, chars)
 
-	log.SetLevel(log.DebugLevel)
+	//log.SetLevel(log.DebugLevel)
 }
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 	//cells, _ := matcher.SliceImage(srcImg, image.Rect(0, 0, 8, 16), pal)
 	toTerm := make(chan RenderOut, 1)
 	go func() { WriteANSI(os.Stderr, toTerm) }()
-	Workers(1, cells, toTerm)
+	Workers(4, cells, toTerm)
 
 	ow, _ := os.Create("preview.png")
 	png.Encode(ow, output)
