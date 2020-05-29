@@ -12,6 +12,7 @@ import (
 
 	"github.com/submersibletoaster/matcher"
 	"github.com/submersibletoaster/matcher/examine"
+	"github.com/submersibletoaster/matcher/glyph"
 	"github.com/submersibletoaster/pixfont"
 
 	"github.com/submersibletoaster/matcher/unscii"
@@ -21,10 +22,19 @@ import (
 
 var font *pixfont.PixFont
 var charmap map[rune]uint32
+var rasterFont glyph.RasterFont
 
 func init() {
 	font = unscii.Font
 	charmap = unscii.CharMap()
+	chars := make([]rune, len(charmap))
+	n := 0
+	for k := range charmap {
+		chars[n] = k
+		n++
+	}
+	rasterFont = glyph.NewRasterFont(font, chars)
+
 	log.SetLevel(log.DebugLevel)
 }
 
@@ -67,18 +77,31 @@ func main() {
 				fmt.Fprintf(os.Stderr, "%#v\t\n", quant.Bounds())
 				draw.Draw(output, cell.Bounds, quant, image.ZP  , draw.Src)
 		*/
-		//seg := matcher.DynamicThreshold(cell.Image)
-
 		seg, bg, fg := cell.DynamicThreshold()
 
-		fmt.Fprintf(os.Stderr, "Seg: %#v ; Cell: %v ; Pos: %v\n", seg.Bounds(), cell.Origin, cell.CharPos)
-		fmt.Fprintf(os.Stderr, "%#v\n", seg)
 		draw.Draw(thrOut, cell.Origin, seg, seg.Bounds().Min, draw.Src)
 
 		//celPal := matcher.PickPalette(cell.Image, 2)
 		//seg.(*image.Paletted).Palette = celPal
 
-		c, bg, fg := matcher.FindBestMatch(cell.Image)
+		//c, bg, fg := matcher.FindBestMatch(cell.Image)
+
+		/*
+			results := rasterFont.Query(seg)
+			seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
+			resultsInverted := rasterFont.Query(seg)
+			var c string
+			if results[0].Score < resultsInverted[0].Score {
+				c = results[0].Char
+			} else {
+				c = resultsInverted[0].Char
+				fg, bg = bg, fg
+			}
+		*/
+		seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
+		results := rasterFont.Query(seg)
+		c := results[0].Char
+
 		draw.Draw(output, cell.Origin, image.NewUniform(bg), image.ZP, draw.Src)
 		font.DrawString(output, cell.Origin.Min.X, cell.Origin.Min.Y, c, fg)
 
@@ -91,8 +114,8 @@ func main() {
 			maskPix[i+3] = maskPix[i]
 		}
 
-		draw.Draw(thrOutCol, cell.Origin, image.NewUniform(bg), cell.Origin.Min, draw.Src)
-		draw.DrawMask(thrOutCol, cell.Origin, image.NewUniform(fg), cell.Origin.Min,
+		draw.Draw(thrOutCol, cell.Origin, image.NewUniform(fg), cell.Origin.Min, draw.Src)
+		draw.DrawMask(thrOutCol, cell.Origin, image.NewUniform(bg), cell.Origin.Min,
 			mask, mask.Bounds().Min, draw.Over)
 
 	}

@@ -55,7 +55,9 @@ type RasterFont struct {
 
 func NewRasterFont(f *pixfont.PixFont, chars []rune) (n RasterFont) {
 	n.Font = f
-	n.Width = f.MeasureString(" ")
+	n.Width = f.MeasureString(" ") // adds one pixel .. why ?
+	n.Width--
+
 	n.Height = f.GetHeight()
 	n.makeInfo(chars)
 
@@ -88,11 +90,15 @@ func (s RasterFont) Query(src *image.Paletted) (out Results) {
 	srcHash := MakeUVHash(src)
 	for r, info := range s.lutRune {
 		similar := srcHash.CosineSimilarity(info.uvHash)
-		_, nDistance := info.HammingDistance(src)
-		if nDistance == 0 {
-			log.Debugf("!! While comparing to '%s' - zero distance\n", string(r))
-		}
-		score := similar * (1.0 - nDistance)
+		score := similar
+
+		/*
+			_, nDistance := info.HammingDistance(src)
+			if nDistance == 0 {
+				log.Debugf("!! While comparing to '%s' - zero distance\n", string(r))
+			}
+			score := 1.0 - nDistance
+		*/
 		//log.Debugf("%s\t%f\n", string(r), score)
 		m := Match{Char: string(r), Rune: r, Score: score, Invert: false}
 		out = append(out, m)
@@ -145,13 +151,15 @@ type uvHash []uint
 
 func MakeUVHash(src *image.Paletted) uvHash {
 	b := src.Bounds()
+	//log.Infof("uvHash bounds %v", b)
 	column := make([]uint, b.Dx())
 	row := make([]uint, b.Dy())
+	//log.Infof("Cols: %d\tRows: %d", b.Dx(), b.Dy())
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			v := src.ColorIndexAt(x, y)
-			column[x] += uint(v)
-			row[y] += uint(v)
+			column[x-b.Min.X] += uint(v)
+			row[y-b.Min.Y] += uint(v)
 		}
 	}
 	uv := make(uvHash, len(column)+len(row))
@@ -168,6 +176,7 @@ func MakeUVHash(src *image.Paletted) uvHash {
 // uvHash could be compared by vector distance or
 // hamming distance
 func (a uvHash) CosineSimilarity(in uvHash) float64 {
+	//log.Infof("uvHash compare similarity %v\t%v", len(a), len(in))
 	b := make(uvHash, len(a))
 	for i, v := range in {
 		b[i] = v

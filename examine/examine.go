@@ -5,6 +5,8 @@ import (
 	"image/color"
 	"image/draw"
 
+	"github.com/Nykakin/quantize"
+
 	"github.com/lucasb-eyer/go-colorful"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,7 +37,7 @@ func ImageToCels(src image.Image, cellX int, cellY int) <-chan *Cel {
 				origin := image.Rect(x, y, x+cellX, y+cellY)
 				cel := copy.SubImage(origin).(*image.RGBA)
 				charPos := image.Point{x / cellX, y / cellY}
-				log.Debugf("ImageToCells: %v", charPos)
+				//log.Debugf("ImageToCells: %v", charPos)
 				out <- &Cel{Image: cel, Origin: origin, CharPos: charPos}
 			}
 		}
@@ -53,12 +55,22 @@ type Cel struct {
 
 type LabColors []colorful.Color
 
+// Getting the right fit for contrasting colors is a real struggle.
+// just using a quantizer to crush to 2 seems best so far.
+func (s Cel) ContrastingColors() []color.RGBA {
+	q := quantize.NewHierarhicalQuantizer()
+	cols, _ := q.Quantize(s.Image, 2)
+
+	return cols
+}
+
 // ContrastingColors - slice of lightest and darkest seen colors
-func (s Cel) ContrastingColors() []colorful.Color {
+func (s Cel) NOTContrastingColors() []colorful.Color {
 	b := s.Image.Bounds()
 
 	dark := make(map[colorful.Color]uint)
 	light := make(map[colorful.Color]uint)
+	distinct := make(map[colorful.Color]uint)
 	for y := b.Min.Y; y <= b.Max.Y; y++ {
 		for x := b.Min.X; x <= b.Max.X; x++ {
 			lab, _ := colorful.MakeColor(s.Image.At(x, y))
@@ -66,6 +78,7 @@ func (s Cel) ContrastingColors() []colorful.Color {
 			dDark := lab.DistanceLab(Black)
 			// Histogram lighter and darker colors
 			// equal distance from black white ignored
+			distinct[lab]++
 			if dDark < dBright {
 				dark[lab]++
 			} else if dDark > dBright {
@@ -73,7 +86,7 @@ func (s Cel) ContrastingColors() []colorful.Color {
 			}
 		}
 	}
-
+	log.Debugf("Distinct colors: %d", len(distinct))
 	out := make([]colorful.Color, 2)
 
 	lightMax := uint(0)
@@ -88,16 +101,23 @@ func (s Cel) ContrastingColors() []colorful.Color {
 			out[1] = k
 		}
 	}
+	if out[0] == out[1] {
+		log.Fatalf("Contrasting colors are same: %v\n%v\n\tLight %v\n\tDark %v\n", out, distinct, light, dark)
+	}
 	return out
 }
 
+// DynamicThreshold - reduce the cels image to a two color paletted image,
 func (s Cel) DynamicThreshold() (*image.Paletted, color.Color, color.Color) {
 	cols := s.ContrastingColors()
+	origPal := color.Palette{cols[0], cols[1]}
 	pal := make(color.Palette, 2)
-	pal[0] = cols[0]
-	pal[1] = cols[1]
-	out := image.NewPaletted(s.Origin, pal)
-	draw.Draw(out, s.Origin, s.Image, s.Origin.Min, draw.Src)
+	pal[0] = Black
+	pal[1] = White
+	out := image.NewPaletted(s.Origin, origPal)
+	draw.FloydSteinberg.Draw(out, s.Origin, s.Image, s.Origin.Min)
+	out.Palette = pal
+	//draw.Draw(out, s.Origin, s.Image, s.Origin.Min, draw.Src)
 	return out, cols[0], cols[1]
 }
 
