@@ -32,13 +32,15 @@ func ImageToCels(src image.Image, cellX int, cellY int) <-chan *Cel {
 	copy := image.NewRGBA(b)
 	draw.Draw(copy, b, src, b.Min, draw.Src)
 	go func() {
+		nth := uint(0)
 		for y := b.Min.Y; y < b.Max.Y-cellY; y += cellY {
 			for x := b.Min.X; x < b.Max.X-cellX; x += cellX {
 				origin := image.Rect(x, y, x+cellX, y+cellY)
 				cel := copy.SubImage(origin).(*image.RGBA)
 				charPos := image.Point{x / cellX, y / cellY}
 				//log.Debugf("ImageToCells: %v", charPos)
-				out <- &Cel{Image: cel, Origin: origin, CharPos: charPos}
+				out <- &Cel{Image: cel, Origin: origin, CharPos: charPos, Nth: nth}
+				nth++
 			}
 		}
 		log.Debug("ImageToCells: Closing channel")
@@ -51,6 +53,7 @@ type Cel struct {
 	Image   *image.RGBA
 	Origin  image.Rectangle
 	CharPos image.Point
+	Nth     uint
 }
 
 type LabColors []colorful.Color
