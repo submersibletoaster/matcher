@@ -67,6 +67,9 @@ func NewRasterFont(f *pixfont.PixFont, chars []rune) (n RasterFont) {
 func (s *RasterFont) makeInfo(chars []rune) {
 	s.lutRune = make(map[rune]*GlyphInfo, len(chars))
 	for _, r := range chars {
+		if !UsablePoint(r) {
+			continue
+		}
 		img := image.NewPaletted(image.Rect(0, 0, s.Width, s.Height), ThresholdPalette)
 		s.Font.DrawRune(img, 0, 0, r, image.White)
 		hash := MakeUVHash(img)
