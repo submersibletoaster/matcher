@@ -8,6 +8,10 @@ https://github.com/pbnjay/pixfont
 * Go image similarity scorer
 https://github.com/rivo/duplo
 
+* Hash base similarity
+github.com/Nr90/imgsim
+
+
 * Color similarity/ distance and proper colorspace
 github.com/lucasb-eyer/go-colorful
 
