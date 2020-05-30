@@ -12,6 +12,7 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"time"
 
 	_ "golang.org/x/image/webp"
 
@@ -31,6 +32,7 @@ var charmap map[rune]uint32
 var rasterFont glyph.RasterFont
 
 var workers = flag.Int("w", 1, "Number of worker routines")
+var debugImages = flag.Bool("debug", false, "Output debug images for glyphs,cel thresholds and colored thresholds.")
 
 func init() {
 	font = unscii.Font
@@ -62,37 +64,18 @@ func main() {
 
 	cells := examine.ImageToCels(srcImg, 8, 16)
 
-	wash := image.NewUniform(color.RGBA{0x88, 0x20, 0x40, 0xff})
-
-	output := image.NewRGBA(srcImg.Bounds())
-	draw.Draw(output, output.Bounds(), wash, image.ZP, draw.Src)
-
-	thrOut := image.NewRGBA(srcImg.Bounds())
-	draw.Draw(thrOut, output.Bounds(), wash, image.ZP, draw.Src)
-
-	thrOutCol := image.NewRGBA(srcImg.Bounds())
-	draw.Draw(thrOutCol, output.Bounds(), wash, image.ZP, draw.Src)
-
-	//pal := matcher.PickPalette(srcImg, 64)
-	//hardpal := matcher.ThresholdPalette
-
-	// TODO - be able to downsample rather than register the font glyph size directly as cell-size
-	//cells, _ := matcher.SliceImage(srcImg, image.Rect(0, 0, 8, 16), pal)
+	renderers := make([]chan<- RenderOut, 0)
 	toTerm := make(chan RenderOut, 1)
-	go func() { WriteANSI(os.Stderr, toTerm) }()
-	Workers(uint(*workers), cells, toTerm)
+	go WriteANSI(os.Stderr, toTerm)
+	renderers = append(renderers, toTerm)
 
-	ow, _ := os.Create("preview.png")
-	png.Encode(ow, output)
-	ow.Close()
+	if *debugImages {
+		toDebug := make(chan RenderOut, 1)
+		go RenderDebugFunc(srcImg)(toDebug)
+		renderers = append(renderers, toDebug)
+	}
 
-	ot, _ := os.Create("threshold.png")
-	png.Encode(ot, thrOut)
-	ot.Close()
-
-	otc, _ := os.Create("color-threshold.png")
-	png.Encode(otc, thrOutCol)
-	otc.Close()
+	Workers(uint(*workers), cells, renderers)
 
 }
 
@@ -137,7 +120,7 @@ func makeCharSheet() {
 
 }
 
-func Workers(n uint, cels <-chan *examine.Cel, out chan<- RenderOut) {
+func Workers(n uint, cels <-chan *examine.Cel, outputs []chan<- RenderOut) {
 	mid := make(chan RenderOut, n)
 	wait := sync.WaitGroup{}
 	go func() {
@@ -162,11 +145,19 @@ func Workers(n uint, cels <-chan *examine.Cel, out chan<- RenderOut) {
 		sort.Sort(buffer)
 
 		for len(buffer) != 0 && (buffer[0].Nth == nextOut) {
-			out <- buffer[0]
+			for _, out := range outputs {
+				out <- buffer[0]
+			}
 			nextOut++
 			buffer = buffer[1:]
 		}
 	}
+	for _, out := range outputs {
+		close(out)
+	}
+	// FIXME kludge to let the Debug images save after its channel closes
+	// should be a waitgroup of renderers maybe?
+	time.Sleep(time.Second)
 
 }
 
@@ -192,64 +183,72 @@ func RenderOne(cel *examine.Cel) RenderOut {
 		c := results[0].Char
 	*/
 
-	return RenderOut{c, fg, bg, cel.CharPos, cel.Nth}
+	return RenderOut{c, fg, bg, cel.CharPos, cel.Nth, seg}
 }
 
-/*
-func RenderDebug(cel examine.Cel) RenderOut {
-	for cell := range cells {
-		seg, bg, fg := cell.DynamicThreshold()
+func RenderDebugFunc(srcImg image.Image) func(<-chan RenderOut) {
 
-		draw.Draw(thrOut, cell.Origin, seg, seg.Bounds().Min, draw.Src)
+	wash := image.NewUniform(color.RGBA{0x88, 0x20, 0x40, 0xff})
+	output := image.NewRGBA(srcImg.Bounds())
+	draw.Draw(output, output.Bounds(), wash, image.ZP, draw.Src)
 
-		//
-		// 	results := rasterFont.Query(seg)
-		// 	seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
-		// 	resultsInverted := rasterFont.Query(seg)
-		// 	var c string
-		// 	if results[0].Score < resultsInverted[0].Score {
-		// 		c = results[0].Char
-		// 	} else {
-		// 		c = resultsInverted[0].Char
-		// 		fg, bg = bg, fg
-		// 	}
-		//
+	thrOut := image.NewRGBA(srcImg.Bounds())
+	draw.Draw(thrOut, output.Bounds(), wash, image.ZP, draw.Src)
 
-		seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
-		results := rasterFont.Query(seg)
-		c := results[0].Char
+	thrOutCol := image.NewRGBA(srcImg.Bounds())
+	draw.Draw(thrOutCol, output.Bounds(), wash, image.ZP, draw.Src)
 
-		toTerm <- RenderOut{c, fg, bg, cell.CharPos}
+	return func(r <-chan RenderOut) {
+		log.Debug("Starting debug out with chan %v", r)
+		for ro := range r {
+			seg, bg, fg := ro.Segmented, ro.Bg, ro.Fg
+			log.Debugf("Segment Bounds: %v", seg.Bounds())
+			c := ro.Char
+			draw.Draw(thrOut, seg.Bounds(), seg, seg.Bounds().Min, draw.Src)
+			seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
+			draw.Draw(output, seg.Bounds(), image.NewUniform(bg), image.ZP, draw.Src)
+			font.DrawString(output, seg.Bounds().Min.X, seg.Bounds().Min.Y, c, fg)
 
-		draw.Draw(output, cell.Origin, image.NewUniform(bg), image.ZP, draw.Src)
-		font.DrawString(output, cell.Origin.Min.X, cell.Origin.Min.Y, c, fg)
+			mask := image.NewRGBA(image.Rect(0, 0, seg.Bounds().Dx(), seg.Bounds().Dy()))
+			draw.Draw(mask, mask.Bounds(), seg, seg.Bounds().Min, draw.Src)
+			maskPix := mask.Pix
+			// the key is a mask has it's ALPHA channel used.
+			for i := 0; i < len(maskPix); i += 4 {
+				maskPix[i+3] = maskPix[i]
+			}
 
-		//draw.Draw(thrOutCol, cell.Bounds, image.NewUniform(bg), image.ZP, draw.Src)
-		mask := image.NewRGBA(image.Rect(0, 0, seg.Bounds().Dx(), seg.Bounds().Dy()))
-		draw.Draw(mask, mask.Bounds(), seg, seg.Bounds().Min, draw.Src)
-		maskPix := mask.Pix
-		// the key is a mask has it's ALPHA channel used.
-		for i := 0; i < len(maskPix); i += 4 {
-			maskPix[i+3] = maskPix[i]
+			draw.Draw(thrOutCol, seg.Bounds(), image.NewUniform(bg), seg.Bounds().Min, draw.Src)
+			draw.DrawMask(thrOutCol, seg.Bounds(), image.NewUniform(fg), seg.Bounds().Min,
+				mask, mask.Bounds().Min, draw.Over)
 		}
 
-		draw.Draw(thrOutCol, cell.Origin, image.NewUniform(fg), cell.Origin.Min, draw.Src)
-		draw.DrawMask(thrOutCol, cell.Origin, image.NewUniform(bg), cell.Origin.Min,
-			mask, mask.Bounds().Min, draw.Over)
+		ow, _ := os.Create("preview.png")
+		png.Encode(ow, output)
+		ow.Close()
+
+		ot, _ := os.Create("threshold.png")
+		png.Encode(ot, thrOut)
+		ot.Close()
+
+		otc, _ := os.Create("color-threshold.png")
+		png.Encode(otc, thrOutCol)
+		otc.Close()
 
 	}
-	close(toTerm)
 }
-*/
 
 type RenderOut struct {
-	Char   string
-	Fg     color.Color
-	Bg     color.Color
-	CelPos image.Point
-	Nth    uint
+	Char      string
+	Fg        color.Color
+	Bg        color.Color
+	CelPos    image.Point
+	Nth       uint
+	Segmented *image.Paletted
 }
 
+// RenderBuff - Sortable collection of RenderOut
+// ANSI needs to emit results in cell order as a stream
+//
 type RenderBuff []RenderOut
 
 func (r RenderBuff) Len() int {
