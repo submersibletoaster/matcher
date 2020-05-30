@@ -22,12 +22,15 @@ import (
 	"github.com/submersibletoaster/matcher/glyph"
 	"github.com/submersibletoaster/pixfont"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/submersibletoaster/matcher/unscii"
 )
 
 var font *pixfont.PixFont
 var charmap map[rune]uint32
 var rasterFont glyph.RasterFont
+
+var workers = flag.Int("w", 1, "Number of worker routines")
 
 func init() {
 	font = unscii.Font
@@ -40,7 +43,7 @@ func init() {
 	}
 	rasterFont = glyph.NewRasterFont(font, chars)
 
-	//log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.DebugLevel)
 }
 
 func main() {
@@ -77,7 +80,7 @@ func main() {
 	//cells, _ := matcher.SliceImage(srcImg, image.Rect(0, 0, 8, 16), pal)
 	toTerm := make(chan RenderOut, 1)
 	go func() { WriteANSI(os.Stderr, toTerm) }()
-	Workers(4, cells, toTerm)
+	Workers(uint(*workers), cells, toTerm)
 
 	ow, _ := os.Create("preview.png")
 	png.Encode(ow, output)

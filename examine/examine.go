@@ -5,7 +5,8 @@ import (
 	"image/color"
 	"image/draw"
 
-	"github.com/Nykakin/quantize"
+	//"github.com/Nykakin/quantize"
+	"github.com/ericpauley/go-quantize/quantize"
 
 	"github.com/lucasb-eyer/go-colorful"
 	log "github.com/sirupsen/logrus"
@@ -33,8 +34,8 @@ func ImageToCels(src image.Image, cellX int, cellY int) <-chan *Cel {
 	draw.Draw(copy, b, src, b.Min, draw.Src)
 	go func() {
 		nth := uint(0)
-		for y := b.Min.Y; y < b.Max.Y-cellY; y += cellY {
-			for x := b.Min.X; x < b.Max.X-cellX; x += cellX {
+		for y := b.Min.Y; y <= b.Max.Y-cellY; y += cellY {
+			for x := b.Min.X; x <= b.Max.X-cellX; x += cellX {
 				origin := image.Rect(x, y, x+cellX, y+cellY)
 				cel := copy.SubImage(origin).(*image.RGBA)
 				charPos := image.Point{x / cellX, y / cellY}
@@ -61,10 +62,26 @@ type LabColors []colorful.Color
 // Getting the right fit for contrasting colors is a real struggle.
 // just using a quantizer to crush to 2 seems best so far.
 func (s Cel) ContrastingColors() []color.RGBA {
-	q := quantize.NewHierarhicalQuantizer()
-	cols, _ := q.Quantize(s.Image, 2)
+	/*q := quantize.NewHierarhicalQuantizer()
+	cols, err := q.Quantize(s.Image, 2)
+	if err != nil {
+		panic(err)
+	}
+	*/
+	cols := make([]color.Color, 0, 2)
+	q := quantize.MedianCutQuantizer{}
+	p := q.Quantize(cols, s.Image)
+	log.Debugf("Contrasting colors: %v", p)
+	if len(p) < 2 {
+		return []color.RGBA{p[0].(color.RGBA), p[0].(color.RGBA)}
+		panic("Palette is single color")
+	}
 
-	return cols
+	out := make([]color.RGBA, len(p))
+	for i, v := range p {
+		out[i] = v.(color.RGBA)
+	}
+	return out
 }
 
 // ContrastingColors - slice of lightest and darkest seen colors
@@ -119,8 +136,9 @@ func (s Cel) DynamicThreshold() (*image.Paletted, color.Color, color.Color) {
 	pal[1] = White
 	out := image.NewPaletted(s.Origin, origPal)
 	draw.FloydSteinberg.Draw(out, s.Origin, s.Image, s.Origin.Min)
-	out.Palette = pal
 	//draw.Draw(out, s.Origin, s.Image, s.Origin.Min, draw.Src)
+
+	out.Palette = pal
 	return out, cols[0], cols[1]
 }
 

@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-//	log.SetLevel(log.DebugLevel)
+	//	log.SetLevel(log.DebugLevel)
 	font := unscii.Font
 
 	// ASCII only
@@ -31,6 +31,7 @@ func main() {
 	fmt.Printf("%d usable unicode codepoints\n", len(chars))
 
 	g := glyph.NewRasterFont(font, chars)
+	log.Infof("%+#v", g)
 	perfect := 0
 	edge := 0
 	//chars = []rune{''}

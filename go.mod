@@ -9,6 +9,7 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20200320125537-f189e35d30ca // indirect
 	github.com/anthonynsimon/bild v0.12.0
 	github.com/cheggaaa/pb/v3 v3.0.4
+	github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4
 	github.com/esimov/colorquant v1.0.0
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/gookit/color v1.2.5

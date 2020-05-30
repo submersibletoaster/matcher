@@ -9,9 +9,9 @@ import (
 	"sort"
 
 	pb "github.com/cheggaaa/pb/v3"
-	"github.com/submersibletoaster/pixfont"
 	"github.com/steakknife/hamming"
 	"github.com/submersibletoaster/matcher/unscii"
+	"github.com/submersibletoaster/pixfont"
 )
 
 const (
