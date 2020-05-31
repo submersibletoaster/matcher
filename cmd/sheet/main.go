@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	_ "image/jpeg"
 	"image/png"
 	"io"
 	"math"
@@ -18,7 +19,6 @@ import (
 
 	ansi "github.com/gookit/color"
 
-	"github.com/submersibletoaster/matcher"
 	"github.com/submersibletoaster/matcher/examine"
 	"github.com/submersibletoaster/matcher/glyph"
 	"github.com/submersibletoaster/pixfont"
@@ -33,8 +33,14 @@ var rasterFont glyph.RasterFont
 
 var workers = flag.Int("w", 1, "Number of worker routines")
 var debugImages = flag.Bool("debug", false, "Output debug images for glyphs,cel thresholds and colored thresholds.")
+var verbose = flag.Bool("v", false, "Verbose logging")
 
 func init() {
+	flag.Parse()
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	font = unscii.Font
 	charmap = unscii.CharMap()
 	chars := make([]rune, len(charmap))
@@ -45,13 +51,11 @@ func init() {
 	}
 	rasterFont = glyph.NewRasterFont(font, chars)
 
-	log.SetLevel(log.DebugLevel)
 }
 
 func main() {
 	makeCharSheet()
 
-	flag.Parse()
 	srcFile := flag.Arg(0)
 	srcIo, _ := os.Open(srcFile)
 	srcImg, _, _ := image.Decode(srcIo)
@@ -81,9 +85,10 @@ func main() {
 
 func makeCharSheet() {
 	//font := matcher.GetFont()
-	lookup := matcher.GetLookup()
+	//lookup := matcher.GetLookup()
+	lookup := rasterFont.GetLookup()
 	chars := len(charmap)
-	fmt.Printf("%d chars\n", chars)
+	log.Debugf("%d chars\n", chars)
 	cols := int(math.Ceil(math.Sqrt(float64(chars))))
 	sX := 8 // magic number - should inspect from font
 	sY := font.GetHeight()
@@ -92,8 +97,8 @@ func makeCharSheet() {
 
 	allChars := make([]string, chars)
 	n := 0
-	for k, _ := range lookup {
-		allChars[n] = k
+	for g, _ := range lookup {
+		allChars[n] = string(g)
 		n++
 	}
 
@@ -272,6 +277,7 @@ func WriteANSI(w io.Writer, chars <-chan RenderOut) {
 		cSeq.Print(cel.Char)
 		_ = cSeq
 	}
+	fmt.Fprintln(w)
 }
 
 func toANSI(in color.Color) (out ansi.RGBColor) {

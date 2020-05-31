@@ -71,7 +71,7 @@ func (s Cel) ContrastingColors() []color.RGBA {
 	cols := make([]color.Color, 0, 2)
 	q := quantize.MedianCutQuantizer{}
 	p := q.Quantize(cols, s.Image)
-	log.Debugf("Contrasting colors: %v", p)
+	//log.Debugf("Contrasting colors: %v", p)
 	if len(p) < 2 {
 		return []color.RGBA{p[0].(color.RGBA), p[0].(color.RGBA)}
 		panic("Palette is single color")

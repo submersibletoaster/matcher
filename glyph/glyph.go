@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/steakknife/hamming"
 	"github.com/submersibletoaster/pixfont"
 )
 
@@ -84,6 +85,10 @@ func (s RasterFont) ImageForRune(c rune) *image.Paletted {
 		return img.Image
 	}
 	return image.NewPaletted(image.Rect(0, 0, s.Width, s.Height), ThresholdPalette)
+}
+
+func (s RasterFont) GetLookup() map[rune]*GlyphInfo {
+	return s.lutRune
 }
 
 // Query - Return scored matches of font glyphs which resemble the input image
@@ -218,4 +223,27 @@ func UsablePoint(r int32) bool {
 	}
 	return false
 
+}
+
+type DHash []uint8
+
+func MakeDHash(src image.Paletted) DHash {
+	b := src.Bounds()
+	length := (b.Dx() * b.Dy()) / 8
+	h := make(DHash, length)
+	p := uint8(0)
+
+	for i, v := range src.Pix {
+		p |= v
+		p = p << i
+		if i%8 == 0 {
+			h[i/8] = p
+			p = 0
+		}
+	}
+	return h
+}
+
+func (d DHash) Distance(in DHash) int {
+	return hamming.Uint8s(d, in)
 }
