@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"sort"
 
 	//"github.com/Nykakin/quantize"
 	"github.com/ericpauley/go-quantize/quantize"
@@ -61,27 +62,67 @@ type LabColors []colorful.Color
 
 // Getting the right fit for contrasting colors is a real struggle.
 // just using a quantizer to crush to 2 seems best so far.
-func (s Cel) ContrastingColors() []color.RGBA {
-	/*q := quantize.NewHierarhicalQuantizer()
-	cols, err := q.Quantize(s.Image, 2)
-	if err != nil {
-		panic(err)
-	}
-	*/
-	cols := make([]color.Color, 0, 2)
+// - this tends to loose structure and contrast
+// better to choose more colors and be selective about
+// the contrast
+
+type Contrast struct {
+	Color    colorful.Color
+	Distance float64
+}
+
+type Contrasting []Contrast
+
+func (c Contrasting) Less(i, j int) bool {
+	return c[i].Distance < c[j].Distance
+}
+func (c Contrasting) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+func (c Contrasting) Len() int {
+	return len(c)
+}
+
+func (s Cel) ContrastingColors() []color.Color {
+	cols := make([]color.Color, 0, 8)
 	q := quantize.MedianCutQuantizer{}
 	p := q.Quantize(cols, s.Image)
-	//log.Debugf("Contrasting colors: %v", p)
+
 	if len(p) < 2 {
-		return []color.RGBA{p[0].(color.RGBA), p[0].(color.RGBA)}
+		return []color.Color{p[0], p[0]}
 		panic("Palette is single color")
 	}
 
-	out := make([]color.RGBA, len(p))
-	for i, v := range p {
-		out[i] = v.(color.RGBA)
-	}
+	// Naive - most prevalent and least prevalent palette colors
+	out := []color.Color{p[0], p[len(p)-1]}
 	return out
+
+	// Choose the two colors with the greatest distance from others
+	cf := make(Contrasting, len(p))
+	// for i, c := range p {
+	// 	col, _ := colorful.MakeColor(c)
+	// 	dist := 0.0
+	// 	for _, d := range p {
+	// 		dc, _ := colorful.MakeColor(d)
+	// 		dist += col.DistanceLab(dc)
+	// 	}
+	// 	cf[i] = Contrast{col, dist}
+
+	// }
+	// sort.Sort(sort.Reverse(cf))
+	for i, c := range p {
+		col, _ := colorful.MakeColor(c)
+		cf[i] = Contrast{col, 0.0}
+	}
+
+	primary, cf := cf[0], cf[1:]
+	for _, c := range cf {
+		c.Distance = c.Color.DistanceLab(primary.Color)
+	}
+	sort.Sort(sort.Reverse(cf))
+
+	return []color.Color{primary.Color, cf[0].Color}
 }
 
 // ContrastingColors - slice of lightest and darkest seen colors
