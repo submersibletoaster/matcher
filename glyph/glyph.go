@@ -6,17 +6,24 @@ import (
 	"math"
 	"sort"
 
+	"github.com/lucasb-eyer/go-colorful"
 	log "github.com/sirupsen/logrus"
 	"github.com/steakknife/hamming"
 	"github.com/submersibletoaster/pixfont"
 )
 
+// ThresholdPalette is a black/white color palette
+var ThresholdPalette color.Palette
+var white colorful.Color
+var black colorful.Color
+
 func init() {
 	log.Debug("")
-}
+	white, _ = colorful.MakeColor(color.White)
+	black, _ = colorful.MakeColor(color.Black)
+	ThresholdPalette = color.Palette{black, white}
 
-// ThresholdPalette is a black/white color palette
-var ThresholdPalette = color.Palette{color.RGBA{0, 0, 0, 0xff}, color.RGBA{0xff, 0xff, 0xff, 0xff}}
+}
 
 // Match - scored match of font glyphs against an image cel
 type Match struct {
@@ -41,8 +48,11 @@ func (r Results) Len() int {
 
 type GlyphInfo struct {
 	Image  *image.Paletted
-	uvHash []uint
+	uvHash uvHash
+	dHash  DHash
+	sHash  SHash
 	r      rune
+	c      string
 }
 type Lookup map[string]image.PalettedImage
 
@@ -74,9 +84,12 @@ func (s *RasterFont) makeInfo(chars []rune) {
 		img := image.NewPaletted(image.Rect(0, 0, s.Width, s.Height), ThresholdPalette)
 		s.Font.DrawRune(img, 0, 0, r, image.White)
 		hash := MakeUVHash(img)
+		dhash := MakeDHash(img)
+		shash := MakeSHash(img)
 		//log.Debugf("%s\t%v\n", string(r), hash)
-		g := GlyphInfo{img, hash, r}
+		g := GlyphInfo{img, hash, dhash, shash, r, string(r)}
 		s.lutRune[r] = &g
+		log.Debugf("%+v\n", g)
 	}
 }
 
@@ -116,27 +129,68 @@ func (s RasterFont) Query(src *image.Paletted) (out Results) {
 	}
 
 	sort.Sort(sort.Reverse(out))
-	//log.Debugf("Best: '%s' , %f", out[0].Char, out[0].Score)
 	//sort.Sort(out)
 	return
+}
+
+func (s RasterFont) DiffQuery(src *image.Paletted) Results {
+	out := make(Results, 0, len(s.lutRune))
+	for r, info := range s.lutRune {
+		_, n := info.HammingDistance(src)
+		m := Match{Char: string(r), Rune: r, Score: n, Invert: false}
+		out = append(out, m)
+	}
+
+	sort.Sort(sort.Reverse(out))
+	return out
+}
+
+func (s RasterFont) DQuery(src *image.Paletted) Results {
+	srcHash := MakeDHash(src)
+	out := make(Results, 0, len(s.lutRune))
+	for r, info := range s.lutRune {
+		_, n := srcHash.Distance(info.dHash)
+		m := Match{Char: string(r), Rune: r, Score: 1.0 - n, Invert: false}
+		out = append(out, m)
+	}
+
+	sort.Sort(sort.Reverse(out))
+	return out
+}
+
+func (s RasterFont) SQuery(src *image.Paletted) Results {
+	srcHash := MakeSHash(src)
+	out := make(Results, 0, len(s.lutRune))
+	for r, info := range s.lutRune {
+		_, n := srcHash.Distance(info.sHash)
+		m := Match{Char: string(r), Rune: r, Score: 1.0 - n, Invert: false}
+		out = append(out, m)
+	}
+
+	sort.Sort(sort.Reverse(out))
+	return out
 }
 
 func (g *GlyphInfo) HammingDistance(src *image.Paletted) (int, float64) {
 	dist := 0
 	limit := 0
 	b := g.Image.Bounds()
+	srcB := src.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
-			have := src.ColorIndexAt(x, y)
-			if have != g.Image.ColorIndexAt(x, y) {
+			have := src.At(x+srcB.Min.X, y+srcB.Min.Y)
+			cmp := g.Image.At(x, y)
+			if have != cmp {
 				dist++
 			}
 			limit++
 		}
 
 	}
+	norm := 1.0 - (float64(dist) / float64(limit))
+	//log.Debugf("self: '%s'\t%f", g.c, norm)
 
-	return dist, float64(dist) / float64(limit)
+	return dist, norm
 }
 
 // count set pixels and return the foreground and background density
@@ -160,15 +214,15 @@ type uvHash []uint
 
 func MakeUVHash(src *image.Paletted) uvHash {
 	b := src.Bounds()
-	//log.Infof("uvHash bounds %v", b)
 	column := make([]uint, b.Dx())
 	row := make([]uint, b.Dy())
-	//log.Infof("Cols: %d\tRows: %d", b.Dx(), b.Dy())
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
-			v := src.ColorIndexAt(x, y)
-			column[x-b.Min.X] += uint(v)
-			row[y-b.Min.Y] += uint(v)
+			v := src.At(x, y)
+			if v == white {
+				column[x-b.Min.X]++
+				row[y-b.Min.Y]++
+			}
 		}
 	}
 	uv := make(uvHash, len(column)+len(row))
@@ -227,23 +281,67 @@ func UsablePoint(r int32) bool {
 
 type DHash []uint8
 
-func MakeDHash(src image.Paletted) DHash {
+func MakeDHash(src *image.Paletted) DHash {
 	b := src.Bounds()
 	length := (b.Dx() * b.Dy()) / 8
 	h := make(DHash, length)
 	p := uint8(0)
 
+	first := src.Palette[src.Pix[0]]
+	n := 0
 	for i, v := range src.Pix {
-		p |= v
-		p = p << i
-		if i%8 == 0 {
+		have := src.Palette[v]
+		if have != first {
+			p++
+		}
+		p = p << 1
+		if n == 8 {
 			h[i/8] = p
 			p = 0
+			n = 0
 		}
+		n++
 	}
 	return h
 }
 
-func (d DHash) Distance(in DHash) int {
-	return hamming.Uint8s(d, in)
+// Distance - gives the hamming distance and normalized distance of
+func (d DHash) Distance(in DHash) (int, float64) {
+	v := hamming.Uint8s(d, in)
+	l := len(d) * 8
+	n := float64(v) / float64(l)
+	return v, n
+}
+
+type SHash []uint8
+
+func MakeSHash(in *image.Paletted) SHash {
+	b := in.Bounds()
+	Nbits := b.Dx() * b.Dy()
+	diag := b.Dx() + 1
+	out := make(SHash, 0, Nbits/8)
+	first := white
+	p := uint8(0)
+	n := 0
+	for i := 0; i < Nbits; i++ {
+		j := (diag * i) % Nbits
+		have := in.Palette[in.Pix[j]]
+		if have != first {
+			p++
+		}
+		p = p << 1
+		if n == 8 {
+			out = append(out, p)
+			n = 0
+		}
+		n++
+	}
+	return out
+}
+
+func (s SHash) Distance(in SHash) (int, float64) {
+	v := hamming.Uint8s(s, in)
+	l := len(s) * 8
+	n := float64(v) / float64(l)
+	return v, n
 }

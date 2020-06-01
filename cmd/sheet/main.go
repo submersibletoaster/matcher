@@ -38,6 +38,7 @@ var verbose = flag.Bool("v", false, "Verbose logging")
 func init() {
 	flag.Parse()
 	if *verbose {
+		log.Info("Setting verbose logging")
 		log.SetLevel(log.DebugLevel)
 	}
 
@@ -50,7 +51,6 @@ func init() {
 		n++
 	}
 	rasterFont = glyph.NewRasterFont(font, chars)
-
 }
 
 func main() {
@@ -169,16 +169,21 @@ func Workers(n uint, cels <-chan *examine.Cel, outputs []chan<- RenderOut) {
 func RenderOne(cel *examine.Cel) RenderOut {
 	seg, bg, fg := cel.DynamicThreshold()
 
-	results := rasterFont.Query(seg)
+	OP := rasterFont.DiffQuery
+
+	results := OP(seg)
 	//seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
-	inv := image.NewPaletted(seg.Bounds(), color.Palette{seg.Palette[1], seg.Palette[0]})
+	inv := image.NewPaletted(seg.Bounds(), seg.Palette)
 	draw.Draw(inv, seg.Bounds(), seg, seg.Bounds().Min, draw.Src)
-	resultsInverted := rasterFont.Query(inv)
+	inv.Palette = color.Palette{seg.Palette[1], seg.Palette[0]}
+	resultsInverted := OP(inv)
 	var c string
 	if results[0].Score > resultsInverted[0].Score {
+		log.Debugf("Regular match\t'%s'\t'%s'", results[0].Char, resultsInverted[0].Char)
 		c = results[0].Char
 	} else {
 		c = resultsInverted[0].Char
+		log.Debugf("Inverted char match\t'%s'\t'%s'", results[0].Char, resultsInverted[0].Char)
 		fg, bg = bg, fg
 	}
 
