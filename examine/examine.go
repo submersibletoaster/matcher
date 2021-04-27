@@ -9,6 +9,7 @@ import (
 	//"github.com/Nykakin/quantize"
 	"github.com/ericpauley/go-quantize/quantize"
 
+	 "github.com/nfnt/resize"
 	"github.com/lucasb-eyer/go-colorful"
 	log "github.com/sirupsen/logrus"
 )
@@ -26,7 +27,7 @@ func init() {
 
 // ImageToCels - Take a source image and slice into subimages
 // of cellX,cellY
-func ImageToCels(src image.Image, cellX int, cellY int) <-chan *Cel {
+func ImageToCels(src image.Image, cellX int, cellY int,outX int, outY int) <-chan *Cel {
 	b := src.Bounds()
 	//width := b.Dx()
 	//height := b.Dy()
@@ -39,9 +40,12 @@ func ImageToCels(src image.Image, cellX int, cellY int) <-chan *Cel {
 			for x := b.Min.X; x <= b.Max.X-cellX; x += cellX {
 				origin := image.Rect(x, y, x+cellX, y+cellY)
 				cel := copy.SubImage(origin).(*image.RGBA)
+
+				newCel := resize.Resize(uint(outX),uint(outY),cel,resize.Bilinear)
+				log.Debugf("Actual cell size %v", newCel.Bounds() )
 				charPos := image.Point{x / cellX, y / cellY}
 				//log.Debugf("ImageToCells: %v", charPos)
-				out <- &Cel{Image: cel, Origin: origin, CharPos: charPos, Nth: nth}
+				out <- &Cel{Image: newCel.(*image.RGBA), Origin: origin, CharPos: charPos, Nth: nth}
 				nth++
 			}
 		}
@@ -175,8 +179,8 @@ func (s Cel) DynamicThreshold() (*image.Paletted, color.Color, color.Color) {
 	pal := make(color.Palette, 2)
 	pal[0] = Black
 	pal[1] = White
-	out := image.NewPaletted(s.Origin, origPal)
-	draw.FloydSteinberg.Draw(out, s.Origin, s.Image, s.Origin.Min)
+	out := image.NewPaletted(s.Image.Bounds(), origPal)
+	draw.FloydSteinberg.Draw(out, s.Image.Bounds(), s.Image, s.Image.Bounds().Min)
 	//draw.Draw(out, s.Origin, s.Image, s.Origin.Min, draw.Src)
 
 	out.Palette = pal

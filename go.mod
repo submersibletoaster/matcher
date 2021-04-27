@@ -18,6 +18,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/pbnjay/pixfont v0.0.0-20200125053448-dd9f796fdec0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3

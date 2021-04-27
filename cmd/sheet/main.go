@@ -34,6 +34,8 @@ var rasterFont glyph.RasterFont
 var workers = flag.Int("w", 1, "Number of worker routines")
 var debugImages = flag.Bool("debug", false, "Output debug images for glyphs,cel thresholds and colored thresholds.")
 var verbose = flag.Bool("v", false, "Verbose logging")
+var width = flag.Int("x", 8, "X-Pixels per cell" )
+var height = flag.Int("y",16, "Y-Pixels per cell")
 
 func init() {
 	flag.Parse()
@@ -57,7 +59,10 @@ func main() {
 	makeCharSheet()
 
 	srcFile := flag.Arg(0)
-	srcIo, _ := os.Open(srcFile)
+	srcIo, err := os.Open(srcFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 	srcImg, _, _ := image.Decode(srcIo)
 	if srcImg.ColorModel() != color.RGBAModel {
 		old := srcImg
@@ -66,7 +71,9 @@ func main() {
 		srcImg = replace
 	}
 
-	cells := examine.ImageToCels(srcImg, 8, 16)
+	//cells := examine.ImageToCels(srcImg, 8, 16)
+	cells := examine.ImageToCels(srcImg, *width, *height, 8, 16)
+
 
 	renderers := make([]chan<- RenderOut, 0)
 	toTerm := make(chan RenderOut, 1)
@@ -174,11 +181,14 @@ func RenderOne(cel *examine.Cel) RenderOut {
 	results := OP(seg)
 	//seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
 	inv := image.NewPaletted(seg.Bounds(), seg.Palette)
-	draw.Draw(inv, seg.Bounds(), seg, seg.Bounds().Min, draw.Src)
 	inv.Palette = color.Palette{seg.Palette[1], seg.Palette[0]}
+	draw.Draw(inv, seg.Bounds(), seg, seg.Bounds().Min, draw.Src)
+	inv.Palette = seg.Palette
+
 	resultsInverted := OP(inv)
 	var c string
-	if results[0].Score > resultsInverted[0].Score {
+	log.Debugf("CEL:%v", seg)
+	if results[0].Score < resultsInverted[0].Score {
 		log.Debugf("Regular match\t'%s'\t'%s'", results[0].Char, resultsInverted[0].Char)
 		c = results[0].Char
 	} else {
@@ -187,6 +197,8 @@ func RenderOne(cel *examine.Cel) RenderOut {
 		fg, bg = bg, fg
 	}
 
+	log.Debugf("R\t%+v", results[0:3])
+	log.Debugf("I\t%+v", resultsInverted[0:3])
 	/*
 		//seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
 		results := rasterFont.Query(seg)
