@@ -221,7 +221,7 @@ func RenderDebugFunc(srcImg image.Image) func(<-chan RenderOut) {
 	draw.Draw(thrOutCol, output.Bounds(), wash, image.ZP, draw.Src)
 
 	return func(r <-chan RenderOut) {
-		log.Debug("Starting debug out with chan %v", r)
+		log.Debugf("Starting debug out with chan %v", r)
 		for ro := range r {
 			seg, bg, fg := ro.Segmented, ro.Bg, ro.Fg
 			log.Debugf("Segment Bounds: %v", seg.Bounds())
