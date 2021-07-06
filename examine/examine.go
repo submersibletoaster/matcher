@@ -89,7 +89,29 @@ func (c Contrasting) Len() int {
 }
 
 func (s Cel) ContrastingColors() []color.Color {
-	cols := make([]color.Color, 0, 8)
+	return NaiveContrast(s)
+//	return DistanceContrast(s)
+//	return LightDarkContrast(s)
+}
+
+func NaiveContrast(s Cel) []color.Color {
+        cols := make([]color.Color, 0, 8)
+        q := quantize.MedianCutQuantizer{}
+        p := q.Quantize(cols, s.Image)
+
+        if len(p) < 2 {
+                return []color.Color{p[0], p[0]}
+                panic("Palette is single color")
+        }
+
+        // Naive - most prevalent and least prevalent palette colors
+        out := []color.Color{p[0], p[len(p)-1]}
+        return out
+}
+
+func DistanceContrast(s Cel) []color.Color {
+
+	cols := make([]color.Color, 0, 64)
 	q := quantize.MedianCutQuantizer{}
 	p := q.Quantize(cols, s.Image)
 
@@ -98,23 +120,19 @@ func (s Cel) ContrastingColors() []color.Color {
 		panic("Palette is single color")
 	}
 
-	// Naive - most prevalent and least prevalent palette colors
-	out := []color.Color{p[0], p[len(p)-1]}
-	return out
-
 	// Choose the two colors with the greatest distance from others
 	cf := make(Contrasting, len(p))
-	// for i, c := range p {
-	// 	col, _ := colorful.MakeColor(c)
-	// 	dist := 0.0
-	// 	for _, d := range p {
-	// 		dc, _ := colorful.MakeColor(d)
-	// 		dist += col.DistanceLab(dc)
-	// 	}
-	// 	cf[i] = Contrast{col, dist}
+	for i, c := range p {
+		col, _ := colorful.MakeColor(c)
+		dist := 0.0
+		for _, d := range p {
+			dc, _ := colorful.MakeColor(d)
+			dist += col.DistanceLab(dc)
+		}
+		cf[i] = Contrast{col, dist}
 
-	// }
-	// sort.Sort(sort.Reverse(cf))
+	}
+	sort.Sort(sort.Reverse(cf))
 	for i, c := range p {
 		col, _ := colorful.MakeColor(c)
 		cf[i] = Contrast{col, 0.0}
@@ -130,7 +148,7 @@ func (s Cel) ContrastingColors() []color.Color {
 }
 
 // ContrastingColors - slice of lightest and darkest seen colors
-func (s Cel) NOTContrastingColors() []colorful.Color {
+func LightDarkContrast(s Cel) []color.Color {
 	b := s.Image.Bounds()
 
 	dark := make(map[colorful.Color]uint)
@@ -146,29 +164,78 @@ func (s Cel) NOTContrastingColors() []colorful.Color {
 			distinct[lab]++
 			if dDark < dBright {
 				dark[lab]++
-			} else if dDark > dBright {
+			} else {
 				light[lab]++
 			}
 		}
 	}
 	log.Debugf("Distinct colors: %d", len(distinct))
-	out := make([]colorful.Color, 2)
+	log.Debugf("light colors: %d", len(light))
+	log.Debugf("dark colors: %d", len(dark))
+	out := make([]color.Color, 2)
+
+
+	var low,high uint
+	sz := b.Size()
+        low = uint( sz.X * sz.Y )
+        high = 0
+	if len(light) == 0 {
+		log.Debug("Empty light colors")
+		if len(dark) == 1 {
+			log.Debug("Using single dark color")
+			for k,_ := range dark {
+				out[0] = k
+				out[1] = k
+			}
+		} else {
+		for k,v := range dark {
+			if v < low {
+				low = v
+				out[0] = k
+			}
+			if v > high {
+				high = v
+				out[1] =k
+			}
+		}
+		}
+	} else if len(dark) == 0 {
+		for k,v := range light {
+			if v < low {
+				low = v
+				out[0] = k
+			}
+			if v > high {
+				high = v
+				out[1] = k
+			}
+		}
+
+	} else {
 
 	lightMax := uint(0)
 	for k, v := range light {
+		log.Debugf("Light col val %v == %d ", k, v )
 		if v > lightMax {
 			out[0] = k
+			lightMax = v
 		}
 	}
+
 	darkMax := uint(0)
 	for k, v := range dark {
 		if v > darkMax {
 			out[1] = k
+			darkMax = v
 		}
 	}
-	if out[0] == out[1] {
-		log.Fatalf("Contrasting colors are same: %v\n%v\n\tLight %v\n\tDark %v\n", out, distinct, light, dark)
+
 	}
+
+	if out[0] == out[1] {
+		//log.Fatalf("Contrasting colors are same: %v\n%v\n\tLight %v\n\tDark %v\n", out, distinct, light, dark)
+	}
+	log.Debugf("colorfulOUT %#v",out)
 	return out
 }
 
@@ -181,7 +248,7 @@ func (s Cel) DynamicThreshold() (*image.Paletted, color.Color, color.Color) {
 	pal[1] = White
 	out := image.NewPaletted(s.Image.Bounds(), origPal)
 	draw.FloydSteinberg.Draw(out, s.Image.Bounds(), s.Image, s.Image.Bounds().Min)
-	//draw.Draw(out, s.Origin, s.Image, s.Origin.Min, draw.Src)
+	//draw.Draw(out, s.Image.Bounds(), s.Image, s.Image.Bounds().Min, draw.Src)
 
 	out.Palette = pal
 	return out, cols[0], cols[1]
