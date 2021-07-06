@@ -56,7 +56,7 @@ func init() {
 }
 
 func main() {
-	makeCharSheet()
+	//makeCharSheet()
 
 	srcFile := flag.Arg(0)
 	srcIo, err := os.Open(srcFile)
@@ -187,14 +187,17 @@ func RenderOne(cel *examine.Cel) RenderOut {
 
 	resultsInverted := OP(inv)
 	var c string
+	var invert bool
 	log.Debugf("CEL:%v", seg)
 	if results[0].Score < resultsInverted[0].Score {
 		log.Debugf("Regular match\t'%s'\t'%s'", results[0].Char, resultsInverted[0].Char)
 		c = results[0].Char
+		invert = false
 	} else {
 		c = resultsInverted[0].Char
 		log.Debugf("Inverted char match\t'%s'\t'%s'", results[0].Char, resultsInverted[0].Char)
 		fg, bg = bg, fg
+		invert = true
 	}
 
 	log.Debugf("R\t%+v", results[0:3])
@@ -205,7 +208,7 @@ func RenderOne(cel *examine.Cel) RenderOut {
 		c := results[0].Char
 	*/
 
-	return RenderOut{c, fg, bg, cel.CharPos, cel.Nth, seg}
+	return RenderOut{c, fg, bg, cel.CharPos, cel.Nth, seg, invert}
 }
 
 func RenderDebugFunc(srcImg image.Image) func(<-chan RenderOut) {
@@ -223,24 +226,34 @@ func RenderDebugFunc(srcImg image.Image) func(<-chan RenderOut) {
 	return func(r <-chan RenderOut) {
 		log.Debugf("Starting debug out with chan %v", r)
 		for ro := range r {
-			seg, bg, fg := ro.Segmented, ro.Bg, ro.Fg
+			seg, bg, fg,pos := ro.Segmented, ro.Bg, ro.Fg, ro.CelPos
+			offset := image.Rect( pos.X * 8, pos.Y * 16 , (pos.X+1) * 8, (pos.Y+1) *16 )
+
 			log.Debugf("Segment Bounds: %v", seg.Bounds())
 			c := ro.Char
-			draw.Draw(thrOut, seg.Bounds(), seg, seg.Bounds().Min, draw.Src)
+			draw.Draw(thrOut, offset, seg, seg.Bounds().Min, draw.Src)
 			seg.Palette[0], seg.Palette[1] = seg.Palette[1], seg.Palette[0]
-			draw.Draw(output, seg.Bounds(), image.NewUniform(bg), image.ZP, draw.Src)
-			font.DrawString(output, seg.Bounds().Min.X, seg.Bounds().Min.Y, c, fg)
+			draw.Draw(output, offset, image.NewUniform(bg), image.ZP, draw.Src)
+			font.DrawString(output, offset.Bounds().Min.X, offset.Bounds().Min.Y, c, fg)
 
 			mask := image.NewRGBA(image.Rect(0, 0, seg.Bounds().Dx(), seg.Bounds().Dy()))
 			draw.Draw(mask, mask.Bounds(), seg, seg.Bounds().Min, draw.Src)
 			maskPix := mask.Pix
 			// the key is a mask has it's ALPHA channel used.
-			for i := 0; i < len(maskPix); i += 4 {
-				maskPix[i+3] = maskPix[i]
+			if ro.Invert == true {
+				for i := 0; i < len(maskPix); i += 4 {
+					maskPix[i+3] = maskPix[i]
+				}
+			} else {
+				for i := 0 ; i < len(maskPix); i += 4 {
+					maskPix[i+3] = 255 - maskPix[i]
+				}
 			}
-
+			//if ro.Invert == true {
+			//	fg,bg = bg,fg
+			//}
 			draw.Draw(thrOutCol, seg.Bounds(), image.NewUniform(bg), seg.Bounds().Min, draw.Src)
-			draw.DrawMask(thrOutCol, seg.Bounds(), image.NewUniform(fg), seg.Bounds().Min,
+			draw.DrawMask(thrOutCol, offset.Bounds(), image.NewUniform(fg), seg.Bounds().Min,
 				mask, mask.Bounds().Min, draw.Over)
 		}
 
@@ -266,6 +279,7 @@ type RenderOut struct {
 	CelPos    image.Point
 	Nth       uint
 	Segmented *image.Paletted
+	Invert    bool
 }
 
 // RenderBuff - Sortable collection of RenderOut
