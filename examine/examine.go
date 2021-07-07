@@ -89,13 +89,15 @@ func (c Contrasting) Len() int {
 }
 
 func (s Cel) ContrastingColors() []color.Color {
-	return NaiveContrast(s)
+//	return NaiveContrastMid(s)
+//	return NaiveContrast(s)
 //	return DistanceContrast(s)
-//	return LightDarkContrast(s)
+	return LightDarkContrast(s)
 }
 
+
 func NaiveContrast(s Cel) []color.Color {
-        cols := make([]color.Color, 0, 8)
+        cols := make([]color.Color, 0, 4)
         q := quantize.MedianCutQuantizer{}
         p := q.Quantize(cols, s.Image)
 
@@ -109,9 +111,21 @@ func NaiveContrast(s Cel) []color.Color {
         return out
 }
 
+func NaiveContrastMid(s Cel) []color.Color {
+	cols := make([]color.Color,0,4)
+	q := quantize.MedianCutQuantizer{}
+	p := q.Quantize(cols,s.Image)
+	if len(p) < 2 {
+		return []color.Color{p[0],p[0]}
+	}
+	out := []color.Color{p[0], p[ len(p) >> 1 ] }
+	return out
+}
+
+
 func DistanceContrast(s Cel) []color.Color {
 
-	cols := make([]color.Color, 0, 64)
+	cols := make([]color.Color, 0, 16)
 	q := quantize.MedianCutQuantizer{}
 	p := q.Quantize(cols, s.Image)
 
@@ -144,7 +158,7 @@ func DistanceContrast(s Cel) []color.Color {
 	}
 	sort.Sort(sort.Reverse(cf))
 
-	return []color.Color{primary.Color, cf[0].Color}
+	return []color.Color{primary.Color, cf[len(cf)-1].Color}
 }
 
 // ContrastingColors - slice of lightest and darkest seen colors
