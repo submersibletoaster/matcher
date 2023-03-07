@@ -18,14 +18,12 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/pbnjay/pixfont v0.0.0-20200125053448-dd9f796fdec0
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/sirupsen/logrus v1.6.0
 	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3
 	github.com/stretchr/testify v1.3.1-0.20190311161405-34c6fa2dc709 // indirect
 	github.com/submersibletoaster/pixfont v0.1.1
-	golang.org/x/image v0.0.0-20200430140353-33d19683fad8
-	golang.org/x/sys v0.0.0-20200515095857-1151b9dac4a9 // indirect
+	golang.org/x/image v0.5.0
 	gonum.org/v1/netlib v0.0.0-20200317120129-c5a04cffd98a // indirect
 	gonum.org/v1/plot v0.7.0 // indirect
 )
